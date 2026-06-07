@@ -25,6 +25,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Create sync config
+        run: |
+          cat > live/config.js <<'EOF'
+          window.SHOPPING_SYNC = {
+            url: 'https://agfmsmdwhvbxqgkoxawa.supabase.co',
+            appKey: 'jason_rach_shop_live_v1',
+            anonKey: '${{ secrets.SHOPPING_SUPABASE_ANON_KEY }}'
+          };
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('live/index.html')
+          s = p.read_text()
+          tags = "<script src=\"config.js\"></script><script src=\"sync.js\"></script>"
+          if 'sync.js' not in s:
+              s = s.replace('</body></html>', tags + '</body></html>')
+          p.write_text(s)
+          PY
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
