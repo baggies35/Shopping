@@ -39,6 +39,7 @@
     state.skipWeekly = state.skipWeekly || {};
     state.finalItems = Array.isArray(state.finalItems) ? state.finalItems : [];
     state.finalKey = state.finalKey || '';
+    state.masterIngredients = Array.isArray(state.masterIngredients) ? state.masterIngredients : [];
 
     state.meals.forEach(m => {
       m.ingredients = Array.isArray(m.ingredients) ? m.ingredients : [];
@@ -70,21 +71,63 @@
     return state;
   };
 
+  const fingerprint = (state) => {
+    const periods = Array.isArray(state.periods) ? state.periods : [];
+    const items = Array.isArray(state.items) ? state.items : [];
+    const currentPeriod = Number(state.currentPeriod || 0);
+    const current = periods[currentPeriod] || periods[0] || {};
+    return JSON.stringify({
+      periodsCount: periods.length,
+      currentPeriod,
+      currentLabel: current.label || '',
+      currentStart: current.startDate || current.startISO || '',
+      currentEnd: current.endDate || current.endISO || '',
+      itemsCount: items.length,
+      boughtCount: items.filter(x => x.status === 'bought').length,
+      finalKey: state.finalKey || ''
+    });
+  };
+
+  const remoteMatchesLocal = async () => {
+    try {
+      const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
+      return fingerprint(remote || {}) === fingerprint(S || {});
+    } catch {
+      return false;
+    }
+  };
+
   let saving = false;
+  let pendingSave = false;
   let saveTimer = null;
   let loadedRemote = false;
 
   const saveRemote = async () => {
-    if (!loadedRemote || saving || typeof S === 'undefined') return;
+    if (!loadedRemote || typeof S === 'undefined') return;
+    if (saving) {
+      pendingSave = true;
+      return;
+    }
+
     saving = true;
+    pendingSave = false;
     try {
       await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
       setStatus(`Synced live · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
     } catch (e) {
-      setStatus('Sync save failed. Still saved on this phone.');
+      const matches = await remoteMatchesLocal();
+      if (matches) {
+        setStatus(`Synced live · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
+      } else {
+        setStatus('Sync save failed. Still saved on this phone.');
+      }
       console.warn(e);
     } finally {
       saving = false;
+      if (pendingSave) {
+        pendingSave = false;
+        queueSave();
+      }
     }
   };
 
