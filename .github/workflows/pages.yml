@@ -38,8 +38,8 @@ jobs:
           from pathlib import Path
           p = Path('live/index.html')
           s = p.read_text()
-          tags = "<script src=\"config.js\"></script><script src=\"sync.js\"></script>"
-          if 'sync.js' not in s:
+          tags = '<script src="config.js"></script><script src="sync.js"></script><script src="periods-fix.js"></script>'
+          if 'periods-fix.js' not in s:
               s = s.replace('</body></html>', tags + '</body></html>')
           p.write_text(s)
           PY
