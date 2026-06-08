@@ -2,8 +2,7 @@ name: Deploy Shopping app to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +24,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create sync config
+      - name: Create sync config and inject scripts
         run: |
           cat > live/config.js <<'EOF'
           window.SHOPPING_SYNC = {
@@ -34,25 +33,20 @@ jobs:
             anonKey: '${{ secrets.SHOPPING_SUPABASE_ANON_KEY }}'
           };
           EOF
-          base64 -d live/period-save-fix.b64 > live/period-save-fix.js
           python - <<'PY'
           from pathlib import Path
+          import re
           p = Path('live/index.html')
           s = p.read_text()
-          tags = '<script src="config.js?v=10"></script><script src="sync.js?v=10"></script><script src="periods-fix.js?v=10"></script><script src="ingredients-fix.js?v=10"></script><script src="meal-swap.js?v=10"></script><script src="period-save-fix.js?v=10"></script><script src="sync-status-fix.js?v=10"></script>'
-          for old in [
-              '<script src="config.js"></script><script src="sync.js"></script><script src="periods-fix.js"></script>',
-              '<script src="config.js"></script><script src="sync.js"></script>',
-              '<script src="config.js?v=2"></script><script src="sync.js?v=2"></script><script src="periods-fix.js?v=2"></script>',
-              '<script src="config.js?v=3"></script><script src="sync.js?v=3"></script><script src="periods-fix.js?v=3"></script>',
-              '<script src="config.js?v=4"></script><script src="sync.js?v=4"></script><script src="periods-fix.js?v=4"></script>',
-              '<script src="config.js?v=5"></script><script src="sync.js?v=5"></script><script src="periods-fix.js?v=5"></script><script src="ingredients-fix.js?v=5"></script>',
-              '<script src="config.js?v=6"></script><script src="sync.js?v=6"></script><script src="periods-fix.js?v=6"></script><script src="ingredients-fix.js?v=6"></script><script src="meal-swap.js?v=6"></script>',
-              '<script src="config.js?v=7"></script><script src="sync.js?v=7"></script><script src="periods-fix.js?v=7"></script><script src="ingredients-fix.js?v=7"></script><script src="meal-swap.js?v=7"></script><script src="period-save-fix.js?v=7"></script>',
-              '<script src="config.js?v=8"></script><script src="sync.js?v=8"></script><script src="periods-fix.js?v=8"></script><script src="ingredients-fix.js?v=8"></script><script src="meal-swap.js?v=8"></script><script src="period-save-fix.js?v=8"></script>',
-              '<script src="config.js?v=9"></script><script src="sync.js?v=9"></script><script src="periods-fix.js?v=9"></script><script src="ingredients-fix.js?v=9"></script><script src="meal-swap.js?v=9"></script><script src="period-save-fix.js?v=9"></script><script src="sync-status-fix.js?v=9"></script>'
-          ]:
-              s = s.replace(old, '')
+          s = re.sub(r'<script src="(?:config|sync|periods-fix|ingredients-fix|meal-swap|period-save-fix|sync-status-fix)\.js(?:\?v=\d+)?"></script>', '', s)
+          tags = ''.join([
+            '<script src="config.js?v=11"></script>',
+            '<script src="sync.js?v=11"></script>',
+            '<script src="periods-fix.js?v=11"></script>',
+            '<script src="ingredients-fix.js?v=11"></script>',
+            '<script src="meal-swap.js?v=11"></script>',
+            '<script src="sync-status-fix.js?v=11"></script>',
+          ])
           s = s.replace('</body></html>', tags + '</body></html>')
           p.write_text(s)
           PY
