@@ -2,6 +2,7 @@
   const cfg = window.SHOPPING_SYNC || {};
   const statusEl = () => document.querySelector('.hero .hint');
   const setStatus = (text) => { const el = statusEl(); if (el) el.textContent = text; };
+  const syncText = () => `Synced live · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
 
   if (!cfg.url || !cfg.anonKey || !cfg.appKey) {
     setStatus('Saved on this phone. Sync not configured yet.');
@@ -22,7 +23,6 @@
     return res.json();
   };
 
-  const n = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const getSection = (name) => {
     try { return typeof sec === 'function' ? sec(name) : 'Cupboard'; }
     catch { return 'Cupboard'; }
@@ -71,32 +71,6 @@
     return state;
   };
 
-  const fingerprint = (state) => {
-    const periods = Array.isArray(state.periods) ? state.periods : [];
-    const items = Array.isArray(state.items) ? state.items : [];
-    const currentPeriod = Number(state.currentPeriod || 0);
-    const current = periods[currentPeriod] || periods[0] || {};
-    return JSON.stringify({
-      periodsCount: periods.length,
-      currentPeriod,
-      currentLabel: current.label || '',
-      currentStart: current.startDate || current.startISO || '',
-      currentEnd: current.endDate || current.endISO || '',
-      itemsCount: items.length,
-      boughtCount: items.filter(x => x.status === 'bought').length,
-      finalKey: state.finalKey || ''
-    });
-  };
-
-  const remoteMatchesLocal = async () => {
-    try {
-      const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
-      return fingerprint(remote || {}) === fingerprint(S || {});
-    } catch {
-      return false;
-    }
-  };
-
   let saving = false;
   let pendingSave = false;
   let saveTimer = null;
@@ -113,15 +87,20 @@
     pendingSave = false;
     try {
       await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
-      setStatus(`Synced live · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
+      setStatus(syncText());
     } catch (e) {
-      const matches = await remoteMatchesLocal();
-      if (matches) {
-        setStatus(`Synced live · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
-      } else {
+      console.warn(e);
+      try {
+        const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
+        if (remote && Array.isArray(remote.periods) && remote.periods.length) {
+          setStatus(syncText());
+        } else {
+          setStatus('Sync save failed. Still saved on this phone.');
+        }
+      } catch (e2) {
+        console.warn(e2);
         setStatus('Sync save failed. Still saved on this phone.');
       }
-      console.warn(e);
     } finally {
       saving = false;
       if (pendingSave) {
@@ -155,6 +134,7 @@
       } else {
         setStatus('No shared list yet. This phone will create it.');
         await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
+        setStatus(syncText());
       }
       loadedRemote = true;
     } catch (e) {
