@@ -38,10 +38,14 @@ jobs:
           from pathlib import Path
           p = Path('live/index.html')
           s = p.read_text()
-          tags = '<script src="config.js?v=3"></script><script src="sync.js?v=3"></script><script src="periods-fix.js?v=3"></script>'
-          s = s.replace('<script src="config.js"></script><script src="sync.js"></script><script src="periods-fix.js"></script>', '')
-          s = s.replace('<script src="config.js"></script><script src="sync.js"></script>', '')
-          s = s.replace('<script src="config.js?v=2"></script><script src="sync.js?v=2"></script><script src="periods-fix.js?v=2"></script>', '')
+          tags = '<script src="config.js?v=4"></script><script src="sync.js?v=4"></script><script src="periods-fix.js?v=4"></script>'
+          for old in [
+              '<script src="config.js"></script><script src="sync.js"></script><script src="periods-fix.js"></script>',
+              '<script src="config.js"></script><script src="sync.js"></script>',
+              '<script src="config.js?v=2"></script><script src="sync.js?v=2"></script><script src="periods-fix.js?v=2"></script>',
+              '<script src="config.js?v=3"></script><script src="sync.js?v=3"></script><script src="periods-fix.js?v=3"></script>'
+          ]:
+              s = s.replace(old, '')
           s = s.replace('</body></html>', tags + '</body></html>')
           p.write_text(s)
           PY
