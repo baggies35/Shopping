@@ -1,5 +1,6 @@
 (() => {
   const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const MONTHS = { jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3, may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8, sept:8, september:8, oct:9, october:9, nov:10, november:10, dec:11, december:11 };
   const blankDays = () => DAY_NAMES.map(day => ({ day, meal: null, status: null }));
   const pad = (n) => String(n).padStart(2, '0');
   const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -16,6 +17,30 @@
   };
   const shortDate = (d) => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   const labelFromDates = (start, end) => `${shortDate(start)} - ${shortDate(end)}`;
+
+  const parseLabelDates = (label) => {
+    const text = String(label || '').replace(/[–—]/g, '-');
+    const parts = text.split('-').map(x => x.trim());
+    if (parts.length < 2) return null;
+
+    const currentYear = new Date().getFullYear();
+    const parsePart = (part, fallbackMonth = null) => {
+      const tokens = part.toLowerCase().replace(/,/g, '').split(/\s+/).filter(Boolean);
+      const dayToken = tokens.find(t => /^\d{1,2}$/.test(t));
+      const monthToken = tokens.find(t => MONTHS[t.slice(0,3)] !== undefined || MONTHS[t] !== undefined);
+      if (!dayToken) return null;
+      const month = monthToken ? (MONTHS[monthToken] ?? MONTHS[monthToken.slice(0,3)]) : fallbackMonth;
+      if (month === null || month === undefined) return null;
+      return new Date(currentYear, month, Number(dayToken));
+    };
+
+    const start = parsePart(parts[0]);
+    if (!start) return null;
+    let end = parsePart(parts[1], start.getMonth());
+    if (!end) return null;
+    if (end < start) end = new Date(start.getFullYear() + 1, end.getMonth(), end.getDate());
+    return { start, end };
+  };
 
   const modalHtml = () => `
     <div id="periodPicker" class="modal">
@@ -50,6 +75,14 @@
       const e = parseIso(period.endDate);
       if (s && e) return { start: s, end: e };
     }
+    const fromLabel = parseLabelDates(period && period.label);
+    if (fromLabel && period) {
+      period.startDate = iso(fromLabel.start);
+      period.endDate = iso(fromLabel.end);
+      period.label = labelFromDates(fromLabel.start, fromLabel.end);
+      if (typeof save === 'function') save();
+      return fromLabel;
+    }
     return null;
   };
 
@@ -63,6 +96,7 @@
       if (!Array.isArray(p.days) || !p.days.length) p.days = blankDays();
       if (!p.createdAt) p.createdAt = Date.now() + i;
       if (!p.label) p.label = i === 0 ? 'This shop' : `Shop ${i + 1}`;
+      inferDates(p);
     });
     if (typeof pi !== 'number' || pi < 0 || pi >= S.periods.length) pi = 0;
   };
