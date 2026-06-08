@@ -38,12 +38,13 @@ jobs:
           from pathlib import Path
           p = Path('live/index.html')
           s = p.read_text()
-          tags = '<script src="config.js?v=4"></script><script src="sync.js?v=4"></script><script src="periods-fix.js?v=4"></script>'
+          tags = '<script src="config.js?v=5"></script><script src="sync.js?v=5"></script><script src="periods-fix.js?v=5"></script><script src="ingredients-fix.js?v=5"></script>'
           for old in [
               '<script src="config.js"></script><script src="sync.js"></script><script src="periods-fix.js"></script>',
               '<script src="config.js"></script><script src="sync.js"></script>',
               '<script src="config.js?v=2"></script><script src="sync.js?v=2"></script><script src="periods-fix.js?v=2"></script>',
-              '<script src="config.js?v=3"></script><script src="sync.js?v=3"></script><script src="periods-fix.js?v=3"></script>'
+              '<script src="config.js?v=3"></script><script src="sync.js?v=3"></script><script src="periods-fix.js?v=3"></script>',
+              '<script src="config.js?v=4"></script><script src="sync.js?v=4"></script><script src="periods-fix.js?v=4"></script>'
           ]:
               s = s.replace(old, '')
           s = s.replace('</body></html>', tags + '</body></html>')
