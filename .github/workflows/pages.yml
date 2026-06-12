@@ -38,14 +38,15 @@ jobs:
           import re
           p = Path('live/index.html')
           s = p.read_text()
-          s = re.sub(r'<script src="(?:config|sync|periods-fix|ingredients-fix|meal-swap|period-save-fix|sync-status-fix)\.js(?:\?v=\d+)?"></script>', '', s)
+          s = re.sub(r'<script src="(?:config|sync|periods-fix|ingredients-fix|meal-swap|period-save-fix|sync-status-fix|share-links)\.js(?:\?v=\d+)?"></script>', '', s)
           tags = ''.join([
-            '<script src="config.js?v=12"></script>',
-            '<script src="sync.js?v=12"></script>',
-            '<script src="periods-fix.js?v=12"></script>',
-            '<script src="ingredients-fix.js?v=12"></script>',
-            '<script src="meal-swap.js?v=12"></script>',
-            '<script src="sync-status-fix.js?v=12"></script>',
+            '<script src="config.js?v=13"></script>',
+            '<script src="sync.js?v=13"></script>',
+            '<script src="periods-fix.js?v=13"></script>',
+            '<script src="ingredients-fix.js?v=13"></script>',
+            '<script src="meal-swap.js?v=13"></script>',
+            '<script src="sync-status-fix.js?v=13"></script>',
+            '<script src="share-links.js?v=13"></script>',
           ])
           s = s.replace('</body></html>', tags + '</body></html>')
           p.write_text(s)
