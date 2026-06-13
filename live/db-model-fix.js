@@ -4,28 +4,34 @@
   function makeId(prefix){ return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9); }
   function sectionFor(name){ try { return typeof sec === 'function' ? sec(name) : 'Cupboard'; } catch { return 'Cupboard'; } }
 
+  function state(){ return window.S || (typeof S !== 'undefined' ? S : null); }
+  function hasState(){ return !!state(); }
+
   function ensureArrays(){
-    if (typeof S === 'undefined' || !S) return false;
-    S.meals = Array.isArray(S.meals) ? S.meals : [];
-    S.ingredients = Array.isArray(S.ingredients) ? S.ingredients : [];
-    S.mealIngredients = Array.isArray(S.mealIngredients) ? S.mealIngredients : [];
-    S.masterIngredients = Array.isArray(S.masterIngredients) ? S.masterIngredients : [];
+    const st = state();
+    if (!st) return false;
+    st.meals = Array.isArray(st.meals) ? st.meals : [];
+    st.ingredients = Array.isArray(st.ingredients) ? st.ingredients : [];
+    st.mealIngredients = Array.isArray(st.mealIngredients) ? st.mealIngredients : [];
+    st.masterIngredients = Array.isArray(st.masterIngredients) ? st.masterIngredients : [];
     return true;
   }
 
   function ensureMealIds(){
+    const st = state();
     if (!ensureArrays()) return false;
     let changed = false;
-    S.meals.forEach(m => {
+    st.meals.forEach(m => {
       if (!m.id) { m.id = makeId('meal'); changed = true; }
     });
     return changed;
   }
 
   function ensureIngredientIds(){
+    const st = state();
     if (!ensureArrays()) return false;
     let changed = false;
-    S.ingredients.forEach(i => {
+    st.ingredients.forEach(i => {
       if (!i.id) { i.id = makeId('ing'); changed = true; }
       i.name = clean(i.name);
       i.defaultUnit = i.defaultUnit || i.unit || '';
@@ -36,29 +42,34 @@
   }
 
   function findMealById(id){
+    const st = state();
     ensureMealIds();
-    return S.meals.find(m => m.id === id) || null;
+    return st ? st.meals.find(m => m.id === id) || null : null;
   }
 
   function findMealByName(name){
+    const st = state();
     ensureMealIds();
     const k = key(name);
-    return S.meals.find(m => key(m.name) === k) || null;
+    return st ? st.meals.find(m => key(m.name) === k) || null : null;
   }
 
   function findIngredientById(id){
+    const st = state();
     ensureIngredientIds();
-    return S.ingredients.find(i => i.id === id) || null;
+    return st ? st.ingredients.find(i => i.id === id) || null : null;
   }
 
   function findIngredientByName(name){
+    const st = state();
     ensureIngredientIds();
     const k = key(name);
-    return S.ingredients.find(i => key(i.name) === k) || null;
+    return st ? st.ingredients.find(i => key(i.name) === k) || null : null;
   }
 
   function getOrCreateIngredient(raw){
-    ensureArrays();
+    const st = state();
+    if (!ensureArrays()) return null;
     ensureIngredientIds();
     raw = raw || {};
     const name = clean(raw.name);
@@ -72,7 +83,7 @@
         defaultSection: raw.section || raw.defaultSection || sectionFor(name),
         defaultType: raw.type || raw.defaultType || 'required'
       };
-      S.ingredients.push(ing);
+      st.ingredients.push(ing);
     } else {
       ing.name = ing.name || name;
       ing.defaultUnit = ing.defaultUnit || raw.unit || raw.defaultUnit || '';
@@ -94,7 +105,8 @@
   }
 
   function upsertMealIngredient(mealId, ingredientIdOrRecord, values){
-    ensureArrays();
+    const st = state();
+    if (!ensureArrays()) return null;
     ensureMealIds();
     ensureIngredientIds();
     values = values || {};
@@ -103,7 +115,7 @@
       : ingredientIdOrRecord;
     if (!mealId || !ingredient || !ingredient.id) return null;
 
-    let row = S.mealIngredients.find(r => {
+    let row = st.mealIngredients.find(r => {
       normaliseJoin(r);
       return r.mealId === mealId && r.ingredientId === ingredient.id && (r.type || 'required') === (values.type || 'required');
     });
@@ -118,7 +130,7 @@
         type: values.type || ingredient.defaultType || 'required',
         section: values.section || ingredient.defaultSection || sectionFor(ingredient.name)
       };
-      S.mealIngredients.push(row);
+      st.mealIngredients.push(row);
     } else {
       row.qty = values.qty || row.qty || '';
       row.unit = values.unit || row.unit || ingredient.defaultUnit || '';
@@ -129,14 +141,15 @@
   }
 
   function rebuildDisplayIngredients(){
-    ensureArrays();
+    const st = state();
+    if (!ensureArrays()) return;
     ensureMealIds();
     ensureIngredientIds();
-    S.mealIngredients.forEach(normaliseJoin);
-    const ingredientsById = Object.fromEntries(S.ingredients.map(i => [i.id, i]));
+    st.mealIngredients.forEach(normaliseJoin);
+    const ingredientsById = Object.fromEntries(st.ingredients.map(i => [i.id, i]));
 
-    S.meals.forEach(m => {
-      const rows = S.mealIngredients.filter(r => r.mealId === m.id);
+    st.meals.forEach(m => {
+      const rows = st.mealIngredients.filter(r => r.mealId === m.id);
       m.ingredients = rows.map(r => {
         const ing = ingredientsById[r.ingredientId] || {};
         return {
@@ -155,30 +168,31 @@
   }
 
   function migrateOldIngredientsToStructure(){
-    ensureArrays();
+    const st = state();
+    if (!ensureArrays()) return false;
     let changed = false;
     changed = ensureMealIds() || changed;
     changed = ensureIngredientIds() || changed;
-    S.mealIngredients.forEach(r => { normaliseJoin(r); });
+    st.mealIngredients.forEach(r => { normaliseJoin(r); });
 
-    S.meals.forEach(m => {
+    st.meals.forEach(m => {
       const oldIngredients = Array.isArray(m.ingredients) ? [...m.ingredients] : [];
       oldIngredients.forEach(raw => {
         if (!clean(raw.name)) return;
         const ing = getOrCreateIngredient(raw);
         if (!ing) return;
-        const before = S.mealIngredients.length;
+        const before = st.mealIngredients.length;
         upsertMealIngredient(m.id, ing, {
           qty: raw.qty || '',
           unit: raw.unit || ing.defaultUnit || '',
           type: raw.type || 'required',
           section: raw.section || ing.defaultSection || sectionFor(raw.name)
         });
-        if (S.mealIngredients.length !== before) changed = true;
+        if (st.mealIngredients.length !== before) changed = true;
       });
     });
 
-    S.masterIngredients.forEach(raw => { if (clean(raw.name)) getOrCreateIngredient(raw); });
+    st.masterIngredients.forEach(raw => { if (clean(raw.name)) getOrCreateIngredient(raw); });
     rebuildDisplayIngredients();
     return changed;
   }
@@ -195,12 +209,13 @@
   }
 
   function removeIngredientFromMeal(mealId, ingredientOrIndex){
-    ensureArrays();
+    const st = state();
+    if (!ensureArrays()) return false;
     ensureMealIds();
     ensureIngredientIds();
     const meal = findMealById(mealId);
     if (!meal) return false;
-    S.mealIngredients.forEach(normaliseJoin);
+    st.mealIngredients.forEach(normaliseJoin);
     rebuildDisplayIngredients();
     const displayList = Array.isArray(meal.ingredients) ? meal.ingredients : [];
     const target = typeof ingredientOrIndex === 'number' ? displayList[ingredientOrIndex] : ingredientOrIndex;
@@ -210,8 +225,8 @@
     const targetNameKey = key(target.name);
     const targetType = target.type || 'required';
 
-    const before = S.mealIngredients.length;
-    S.mealIngredients = S.mealIngredients.filter(r => {
+    const before = st.mealIngredients.length;
+    st.mealIngredients = st.mealIngredients.filter(r => {
       normaliseJoin(r);
       if (r.mealId !== meal.id) return true;
       if (targetJoinId && r.id === targetJoinId) return false;
@@ -222,7 +237,7 @@
     });
 
     rebuildDisplayIngredients();
-    return S.mealIngredients.length !== before;
+    return st.mealIngredients.length !== before;
   }
 
   window.shoppingDb = {
@@ -237,14 +252,19 @@
     addIngredientToMeal,
     removeIngredientFromMeal,
     ensureMealIds,
-    ensureIngredientIds
+    ensureIngredientIds,
+    hasState
   };
 
-  setTimeout(() => {
-    if (typeof S !== 'undefined') {
-      const changed = migrateOldIngredientsToStructure();
-      if (changed && typeof save === 'function') save();
-      if (typeof render === 'function') render();
+  function runWhenReady(attempt){
+    if (!hasState()) {
+      if ((attempt || 0) < 100) setTimeout(() => runWhenReady((attempt || 0) + 1), 50);
+      return;
     }
-  }, 100);
+    const changed = migrateOldIngredientsToStructure();
+    if (changed && typeof save === 'function') save();
+    if (typeof render === 'function') render();
+  }
+
+  runWhenReady(0);
 })();
