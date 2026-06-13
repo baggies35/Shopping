@@ -5,6 +5,33 @@
 
   window.__targetMealIdForIngredient = window.__targetMealIdForIngredient || '';
 
+  function showLiveError(context, error, extra){
+    const msg = error && error.message ? error.message : String(error || 'Unknown error');
+    const stack = error && error.stack ? error.stack : '';
+    const details = [
+      'Context: ' + context,
+      'Message: ' + msg,
+      extra ? 'Extra: ' + extra : '',
+      stack ? 'Stack: ' + stack : ''
+    ].filter(Boolean).join('\n\n');
+
+    console.error(context, error, extra || '');
+
+    let box = document.getElementById('liveErrorBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'liveErrorBox';
+      box.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:99999;background:#fff1f1;border:2px solid #b84b4b;border-radius:14px;padding:12px;color:#1e1b16;font-family:system-ui;max-height:45vh;overflow:auto;box-shadow:0 8px 28px #0004;text-align:left;';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>App error</b><button id="liveErrorClose" style="border:0;border-radius:10px;padding:7px 10px;font-weight:900">Close</button></div><pre style="white-space:pre-wrap;font-size:12px;line-height:1.25;margin:10px 0 0">' + details.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</pre>';
+    document.getElementById('liveErrorClose').onclick = () => box.remove();
+    alert('Error shown at bottom of screen. Screenshot that box.');
+  }
+
+  window.addEventListener('error', ev => showLiveError('window.error', ev.error || ev.message, ev.filename + ':' + ev.lineno + ':' + ev.colno));
+  window.addEventListener('unhandledrejection', ev => showLiveError('unhandled promise rejection', ev.reason));
+
   function ensureMealIdsFallback(){
     if (!Array.isArray(window.S?.meals)) return;
     let changed = false;
@@ -58,10 +85,10 @@
   }
 
   function removeIngredientDirect(meal, index){
-    if (!meal) return false;
+    if (!meal) throw new Error('removeIngredientDirect: meal is blank');
     const displayList = Array.isArray(meal.ingredients) ? meal.ingredients : [];
     const target = displayList[Number(index)];
-    if (!target) return false;
+    if (!target) throw new Error('removeIngredientDirect: no target at index ' + index + '. Display count=' + displayList.length);
 
     const targetJoinId = target.mealIngredientId || target.id || '';
     const targetIngredientId = target.ingredientId || '';
@@ -177,8 +204,7 @@
 
       if (!currentMeal) {
         const available = Array.isArray(S?.meals) ? S.meals.map(m => (m.id || 'no-id') + ':' + m.name).join(', ') : 'none';
-        alert('Could not find the meal to add this to. Available meals: ' + available);
-        return;
+        throw new Error('Could not find meal to add ingredient. Available=' + available);
       }
 
       const raw = { name, qty, unit, type, section };
@@ -197,27 +223,27 @@
       if (typeof render === 'function') render();
       if (typeof editMeal === 'function') editMeal(currentMeal.name);
     } catch(e) {
-      console.error(e);
-      alert('Could not add ingredient. I have logged the error in the browser console.');
+      showLiveError('savePickedIngredient', e, 'targetMealId=' + window.__targetMealIdForIngredient + ', mealTitle=' + (document.getElementById('mealTitle')?.textContent || ''));
     }
   };
 
   window.liveRemoveIngredient = function liveRemoveIngredient(i){
     try {
       const currentMeal = findCurrentMeal();
-      if (!currentMeal) { alert('Could not find the meal to remove from.'); return; }
+      if (!currentMeal) throw new Error('Could not find current meal. targetMealId=' + window.__targetMealIdForIngredient + ', candidate=' + currentMealNameCandidate());
       if (!confirm('Remove ingredient?')) return;
 
       const removed = removeIngredientDirect(currentMeal, Number(i));
-      if (!removed) { alert('Could not find that ingredient row to remove.'); return; }
+      if (!removed) throw new Error('removeIngredientDirect returned false for index ' + i + ', meal=' + currentMeal.name + ', mealId=' + currentMeal.id);
 
       S.finalItems = [];
       if (typeof save === 'function') save();
       if (typeof render === 'function') render();
       if (typeof editMeal === 'function') editMeal(currentMeal.name);
     } catch(e) {
-      console.error(e);
-      alert('Could not remove ingredient. I have logged the error in the browser console.');
+      const meal = findCurrentMeal();
+      const extra = 'index=' + i + ', targetMealId=' + window.__targetMealIdForIngredient + ', meal=' + (meal ? meal.name : 'none') + ', displayCount=' + (meal && Array.isArray(meal.ingredients) ? meal.ingredients.length : 'none') + ', links=' + (Array.isArray(S?.mealIngredients) ? S.mealIngredients.length : 'none');
+      showLiveError('liveRemoveIngredient', e, extra);
     }
   };
 
