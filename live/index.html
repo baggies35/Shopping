@@ -41,7 +41,8 @@
           .replace('Copy Jason test link', 'Copy Jason link')
           .replace('Copy Rach test link', 'Copy Rach link')
           .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live-' + BUILD;")
-          .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()");
+          .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()")
+          .replace('load();', 'load();window.S=S;');
 
         const livePatch = `
           <script src="config.js?b=${BUILD}"><\/script>
