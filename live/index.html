@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Our Shop</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#f7f3ec;color:#1e1b16;display:grid;place-items:center;min-height:100vh;padding:18px;text-align:center}
@@ -16,7 +19,19 @@
   </div>
   <script>
     (async function(){
-      const source = 'https://raw.githubusercontent.com/baggies35/Shopping/bdb54cd8c7227501e0d98578ad4dc7f968413ed0/live-next/index.html';
+      const BUILD = String(Date.now());
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if (window.caches && caches.keys) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch(e) { console.warn('Cache clear skipped', e); }
+
+      const source = 'https://raw.githubusercontent.com/baggies35/Shopping/bdb54cd8c7227501e0d98578ad4dc7f968413ed0/live-next/index.html?b=' + BUILD;
       try {
         let html = await fetch(source, { cache: 'no-store' }).then(r => r.text());
         html = html
@@ -25,21 +40,21 @@
           .replace('Current live app stays untouched. These are test links.', 'Copy links for you and Rach.')
           .replace('Copy Jason test link', 'Copy Jason link')
           .replace('Copy Rach test link', 'Copy Rach link')
-          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live-20260613-0809';")
+          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live-' + BUILD;")
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()");
 
         const livePatch = `
-          <script src="config.js?v=20260613-0809"><\/script>
-          <script src="sync.js?v=20260613-0809"><\/script>
-          <script src="db-model-fix.js?v=20260613-0809"><\/script>
-          <script src="app-live-patch.js?v=20260613-0809"><\/script>`;
+          <script src="config.js?b=${BUILD}"><\/script>
+          <script src="sync.js?b=${BUILD}"><\/script>
+          <script src="db-model-fix.js?b=${BUILD}"><\/script>
+          <script src="app-live-patch.js?b=${BUILD}"><\/script>`;
 
         html = html.replace('</body>', livePatch + '</body>');
         document.open();
         document.write(html);
         document.close();
       } catch (e) {
-        document.body.innerHTML = '<div class="card"><h1>Could not load app</h1><p>Please refresh.</p></div>';
+        document.body.innerHTML = '<div class="card"><h1>Could not load app</h1><p>Please refresh.</p><pre style="white-space:pre-wrap;text-align:left">'+String(e && e.stack || e)+'</pre></div>';
       }
     })();
   </script>
