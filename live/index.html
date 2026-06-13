@@ -35,22 +35,36 @@
             (function(){
               function clean(v){ return String(v || '').trim(); }
               function lower(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+              window.__targetMealForIngredient = '';
+
+              function currentMealNameCandidate() {
+                const names = [];
+                if (typeof mealName !== 'undefined' && mealName) names.push(mealName);
+                const title = document.getElementById('mealTitle')?.textContent;
+                if (title) names.push(title);
+                const inputName = document.getElementById('mealN')?.value;
+                if (inputName) names.push(inputName);
+                return names.find(Boolean) || '';
+              }
+
+              function findMealByName(n) {
+                if (!n) return null;
+                if (typeof meal === 'function') {
+                  const found = meal(n);
+                  if (found) return found;
+                }
+                if (Array.isArray(S?.meals)) return S.meals.find(m => lower(m.name) === lower(n)) || null;
+                return null;
+              }
 
               function findMealForIngredientAdd() {
                 const candidates = [];
-                if (typeof mealName !== 'undefined' && mealName) candidates.push(mealName);
-                const title = document.getElementById('mealTitle')?.textContent;
-                if (title) candidates.push(title);
-                const inputName = document.getElementById('mealN')?.value;
-                if (inputName) candidates.push(inputName);
+                if (window.__targetMealForIngredient) candidates.push(window.__targetMealForIngredient);
+                const current = currentMealNameCandidate();
+                if (current) candidates.push(current);
                 for (const n of candidates) {
-                  const found = (typeof meal === 'function') ? meal(n) : null;
+                  const found = findMealByName(n);
                   if (found) return { meal: found, name: found.name || n };
-                }
-                if (Array.isArray(S?.meals) && candidates.length) {
-                  const wanted = lower(candidates[0]);
-                  const found = S.meals.find(m => lower(m.name) === wanted);
-                  if (found) return { meal: found, name: found.name };
                 }
                 return { meal: null, name: candidates[0] || '' };
               }
@@ -75,6 +89,23 @@
                 tidyStatusText();
               }
 
+              const originalOpenIngredientPicker = window.openIngredientPicker;
+              window.openIngredientPicker = function openIngredientPickerWithMealTarget() {
+                const candidate = currentMealNameCandidate();
+                const found = findMealByName(candidate);
+                if (found) window.__targetMealForIngredient = found.name;
+                else window.__targetMealForIngredient = candidate || window.__targetMealForIngredient || '';
+                if (typeof originalOpenIngredientPicker === 'function') return originalOpenIngredientPicker();
+              };
+
+              const originalEditMeal = window.editMeal;
+              if (typeof originalEditMeal === 'function') {
+                window.editMeal = function editMealWithTarget(n) {
+                  window.__targetMealForIngredient = n || '';
+                  return originalEditMeal(n);
+                };
+              }
+
               window.savePickedIngredient = function savePickedIngredientFixed() {
                 try {
                   const name = clean(document.getElementById('pickName')?.value);
@@ -89,7 +120,8 @@
                   const foundMeal = findMealForIngredientAdd();
                   const currentMeal = foundMeal.meal;
                   if (!currentMeal) {
-                    alert('Could not find the meal to add this to. Tap Edit on the meal again, then add the ingredient.');
+                    const available = Array.isArray(S?.meals) ? S.meals.map(m => m.name).join(', ') : 'none';
+                    alert('Could not find the meal to add this to. Meal target was: ' + (foundMeal.name || 'blank') + '. Available meals: ' + available);
                     return;
                   }
 
@@ -98,6 +130,7 @@
                   if (alreadyThere && !confirm(name + ' is already on this meal. Add it again anyway?')) return;
 
                   currentMeal.ingredients.push(ingredient);
+                  window.__targetMealForIngredient = foundMeal.name || currentMeal.name;
 
                   if (Array.isArray(S.masterIngredients)) {
                     const existing = S.masterIngredients.find(x => lower(x.name) === lower(name));
