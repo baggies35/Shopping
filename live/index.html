@@ -27,6 +27,62 @@
           .replace('Copy Rach test link', 'Copy Rach link')
           .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live';")
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()");
+
+        const livePatch = `
+          <script src="config.js"><\/script>
+          <script src="sync.js"><\/script>
+          <script>
+            (function(){
+              function tidyStatusText() {
+                document.querySelectorAll('#days .pill, #planDays .muted').forEach(el => {
+                  const t = (el.textContent || '').trim().toLowerCase();
+                  if (t === 'rejected') el.textContent = 'Rejected';
+                  if (t === 'agreed') el.textContent = 'Agreed';
+                  if (t === 'suggested') el.textContent = 'Suggested';
+                });
+              }
+
+              function makeHomeMealsOpenPlan() {
+                document.querySelectorAll('#days .day').forEach(el => {
+                  el.onclick = function(){ go('plan'); };
+                });
+              }
+
+              function applyLivePatch() {
+                makeHomeMealsOpenPlan();
+                tidyStatusText();
+              }
+
+              const originalRender = window.render;
+              if (typeof originalRender === 'function') {
+                window.render = function patchedRender() {
+                  originalRender();
+                  setTimeout(applyLivePatch, 0);
+                };
+              }
+
+              const originalRespond = window.respond;
+              if (typeof originalRespond === 'function') {
+                window.respond = function patchedRespond(i, s) {
+                  originalRespond(i, String(s || '').toLowerCase());
+                  setTimeout(applyLivePatch, 0);
+                };
+              }
+
+              setTimeout(function(){ if (typeof render === 'function') render(); applyLivePatch(); }, 250);
+
+              setInterval(function(){
+                if (document.hidden) return;
+                if (typeof window.refreshSharedList === 'function') window.refreshSharedList();
+              }, 15000);
+
+              document.addEventListener('visibilitychange', function(){
+                if (!document.hidden && typeof window.refreshSharedList === 'function') window.refreshSharedList();
+              });
+            })();
+          <\/script>`;
+
+        html = html.replace('</body>', livePatch + '</body>');
         document.open();
         document.write(html);
         document.close();
