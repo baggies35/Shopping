@@ -33,6 +33,9 @@
           <script src="sync.js"><\/script>
           <script>
             (function(){
+              function clean(v){ return String(v || '').trim(); }
+              function lower(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
               function tidyStatusText() {
                 document.querySelectorAll('#days .pill, #planDays .muted').forEach(el => {
                   const t = (el.textContent || '').trim().toLowerCase();
@@ -52,6 +55,56 @@
                 makeHomeMealsOpenPlan();
                 tidyStatusText();
               }
+
+              window.savePickedIngredient = function savePickedIngredientFixed() {
+                try {
+                  const name = clean(document.getElementById('pickName')?.value);
+                  if (!name) { alert('Add an ingredient name first.'); return; }
+
+                  const qty = clean(document.getElementById('pickQty')?.value);
+                  const unit = document.getElementById('pickUnit')?.value || '';
+                  const type = document.getElementById('pickType')?.value || 'required';
+                  const section = document.getElementById('pickSection')?.value || (typeof sec === 'function' ? sec(name) : 'Cupboard');
+                  const ingredient = { name, qty, unit, type, section };
+
+                  const currentMeal = (typeof meal === 'function') ? meal(mealName) : null;
+                  if (!currentMeal) {
+                    alert('Could not find the meal to add this to. Close and reopen the meal, then try again.');
+                    return;
+                  }
+
+                  currentMeal.ingredients = Array.isArray(currentMeal.ingredients) ? currentMeal.ingredients : [];
+                  const alreadyThere = currentMeal.ingredients.some(x => lower(x.name) === lower(name));
+                  if (alreadyThere && !confirm(name + ' is already on this meal. Add it again anyway?')) return;
+
+                  currentMeal.ingredients.push(ingredient);
+
+                  if (Array.isArray(S.masterIngredients)) {
+                    const existing = S.masterIngredients.find(x => lower(x.name) === lower(name));
+                    if (existing) {
+                      existing.qty = existing.qty || qty;
+                      existing.unit = unit || existing.unit || '';
+                      existing.type = type || existing.type || 'required';
+                      existing.section = section || existing.section || 'Cupboard';
+                    } else {
+                      S.masterIngredients.push({ ...ingredient });
+                    }
+                  } else {
+                    S.masterIngredients = [{ ...ingredient }];
+                  }
+
+                  S.finalItems = [];
+                  if (typeof closeM === 'function') closeM('ingredientPicker');
+                  else document.getElementById('ingredientPicker')?.classList.remove('on');
+
+                  if (typeof save === 'function') save();
+                  if (typeof render === 'function') render();
+                  if (typeof editMeal === 'function') editMeal(mealName);
+                } catch (e) {
+                  console.error(e);
+                  alert('Could not add ingredient. I have logged the error in the browser console.');
+                }
+              };
 
               const originalRender = window.render;
               if (typeof originalRender === 'function') {
