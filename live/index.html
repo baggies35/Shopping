@@ -36,6 +36,25 @@
               function clean(v){ return String(v || '').trim(); }
               function lower(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
+              function findMealForIngredientAdd() {
+                const candidates = [];
+                if (typeof mealName !== 'undefined' && mealName) candidates.push(mealName);
+                const title = document.getElementById('mealTitle')?.textContent;
+                if (title) candidates.push(title);
+                const inputName = document.getElementById('mealN')?.value;
+                if (inputName) candidates.push(inputName);
+                for (const n of candidates) {
+                  const found = (typeof meal === 'function') ? meal(n) : null;
+                  if (found) return { meal: found, name: found.name || n };
+                }
+                if (Array.isArray(S?.meals) && candidates.length) {
+                  const wanted = lower(candidates[0]);
+                  const found = S.meals.find(m => lower(m.name) === wanted);
+                  if (found) return { meal: found, name: found.name };
+                }
+                return { meal: null, name: candidates[0] || '' };
+              }
+
               function tidyStatusText() {
                 document.querySelectorAll('#days .pill, #planDays .muted').forEach(el => {
                   const t = (el.textContent || '').trim().toLowerCase();
@@ -67,9 +86,10 @@
                   const section = document.getElementById('pickSection')?.value || (typeof sec === 'function' ? sec(name) : 'Cupboard');
                   const ingredient = { name, qty, unit, type, section };
 
-                  const currentMeal = (typeof meal === 'function') ? meal(mealName) : null;
+                  const foundMeal = findMealForIngredientAdd();
+                  const currentMeal = foundMeal.meal;
                   if (!currentMeal) {
-                    alert('Could not find the meal to add this to. Close and reopen the meal, then try again.');
+                    alert('Could not find the meal to add this to. Tap Edit on the meal again, then add the ingredient.');
                     return;
                   }
 
@@ -99,7 +119,7 @@
 
                   if (typeof save === 'function') save();
                   if (typeof render === 'function') render();
-                  if (typeof editMeal === 'function') editMeal(mealName);
+                  if (typeof editMeal === 'function') editMeal(foundMeal.name || currentMeal.name);
                 } catch (e) {
                   console.error(e);
                   alert('Could not add ingredient. I have logged the error in the browser console.');
