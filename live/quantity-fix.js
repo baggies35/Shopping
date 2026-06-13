@@ -17,6 +17,22 @@
     } catch(e) { return null; }
   }
 
+  function makeHomeCardsOpenPlan(){
+    try {
+      const days = document.getElementById('days');
+      if (!days) return;
+      days.querySelectorAll('.day, .card, .item').forEach(el => {
+        const text = (el.textContent || '').trim();
+        if (!text || text.toLowerCase().includes('what we')) return;
+        el.style.cursor = 'pointer';
+        el.onclick = function(ev){
+          if (ev && ev.target && ev.target.closest && ev.target.closest('button')) return;
+          if (typeof go === 'function') go('plan');
+        };
+      });
+    } catch(e) { console.warn('home click patch failed', e); }
+  }
+
   window.openMasterIng = function openMasterIngFixed(k){
     try {
       if (typeof resetModal === 'function') resetModal();
@@ -36,6 +52,33 @@
       document.getElementById('ing').classList.add('on');
     } catch(e) {
       alert('Could not open ingredient editor: ' + (e && e.message ? e.message : e));
+    }
+  };
+
+  const originalChooseIngredient = window.chooseIngredient;
+  window.chooseIngredient = function chooseIngredientAndScroll(k){
+    try {
+      if (typeof originalChooseIngredient === 'function') originalChooseIngredient(k);
+      const picked = firstIngredientForKey(k);
+      if (picked) {
+        const title = document.getElementById('chosenIngredientTitle');
+        const name = document.getElementById('pickName');
+        const qty = document.getElementById('pickQty');
+        const unit = document.getElementById('pickUnit');
+        const type = document.getElementById('pickType');
+        const section = document.getElementById('pickSection');
+        if (title) title.textContent = (picked.name || '').replace(/\b\w/g, c => c.toUpperCase());
+        if (name) name.value = picked.name || '';
+        if (qty) qty.value = picked.qty || '';
+        if (unit) unit.value = picked.unit || '';
+        if (type) type.value = picked.type || 'required';
+        if (section) section.value = picked.section || (typeof sec === 'function' ? sec(picked.name || '') : 'Cupboard');
+      }
+      const target = document.getElementById('chosenIngredientTitle') || document.getElementById('pickName');
+      if (target && target.scrollIntoView) setTimeout(() => target.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+      setTimeout(() => document.getElementById('pickQty')?.focus(), 250);
+    } catch(e) {
+      alert('Could not load ingredient details: ' + (e && e.message ? e.message : e));
     }
   };
 
@@ -82,8 +125,20 @@
       if (typeof save === 'function') save();
       if (typeof render === 'function') render();
       if (typeof renderSetup === 'function') renderSetup();
+      setTimeout(makeHomeCardsOpenPlan, 50);
     } catch(e) {
       alert('Could not save ingredient: ' + (e && e.message ? e.message : e));
     }
   };
+
+  const originalRender = window.render;
+  if (typeof originalRender === 'function') {
+    window.render = function renderWithBehaviourFixes(){
+      const result = originalRender();
+      setTimeout(makeHomeCardsOpenPlan, 50);
+      return result;
+    };
+  }
+
+  setTimeout(makeHomeCardsOpenPlan, 250);
 })();
