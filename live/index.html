@@ -56,6 +56,10 @@
       try {
         let html = await fetch(source, { cache: 'no-store' }).then(r => r.text());
         const liveBuild = 'live-' + BUILD;
+        const oldOpenMaster = "function openMasterIng(k){resetModal();editMode='master';masterKey=k;$('qtyField').style.display='none';$('typeWrap').style.display='none';let x=allIngredients().find(a=>a.key===k);$('ingTitle').textContent='Edit ingredient';$('inName').value=x.name;$('inQty').value='';$('inUnit').value=x.unit||'';$('inType').value=x.type||'required';$('inSection').value=x.section||sec(x.name);$('ing').classList.add('on')}";
+        const newOpenMaster = "function openMasterIng(k){resetModal();editMode='master';masterKey=k;let x=allIngredients().find(a=>a.key===k);$('ingTitle').textContent='Edit ingredient';$('qtyField').style.display='block';$('typeWrap').style.display='block';$('inName').value=x.name;$('inQty').value=x.qty||'';$('inUnit').value=x.unit||'';$('inType').value=x.type||'required';$('inSection').value=x.section||sec(x.name);$('ing').classList.add('on')}";
+        const oldSaveMaster = "if(editMode==='master'){S.meals.forEach(m=>m.ingredients.forEach(g=>{if(norm(g.name)===masterKey){g.name=x.name;g.unit=x.unit;g.section=x.section}}));S.finalItems=[];closeM('ing');save();renderSetup();return}";
+        const newSaveMaster = "if(editMode==='master'){S.meals.forEach(m=>m.ingredients.forEach(g=>{if(norm(g.name)===masterKey){g.name=x.name;g.qty=x.qty;g.unit=x.unit;g.type=x.type;g.section=x.section}}));S.masterIngredients.forEach(g=>{if(norm(g.name)===masterKey){g.name=x.name;g.qty=x.qty;g.unit=x.unit;g.type=x.type;g.section=x.section}});S.finalItems=[];closeM('ing');save();render();renderSetup();return}";
         html = html
           .replace('<title>Shopping Next</title>', '<title>Our Shop</title>')
           .replace('Test version · live-next', 'Shared shopping app')
@@ -63,6 +67,8 @@
           .replace('Copy Jason test link', 'Copy Jason link')
           .replace('Copy Rach test link', 'Copy Rach link')
           .replace("const STORE='shopping-live';const BUILD='live-next-1';let S,pi=0,dayIx=0,mealName='',editIx=null,shopIx=null,weeklyIx=null,masterKey=null,finalIx=null,editMode='',setupMode='meals',shopMode='need';", "const STORE='shopping-live';const BUILD='" + liveBuild + "';var S,pi=0,dayIx=0,mealName='',editIx=null,shopIx=null,weeklyIx=null,masterKey=null,finalIx=null,editMode='',setupMode='meals',shopMode='need';")
+          .replace(oldOpenMaster, newOpenMaster)
+          .replace(oldSaveMaster, newSaveMaster)
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()")
           .replace('load();', 'load();window.S=S;');
 
