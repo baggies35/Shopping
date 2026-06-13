@@ -2,25 +2,38 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Our Shop</title>
-  <meta http-equiv="refresh" content="0; url=../live-next/">
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#f7f3ec;color:#1e1b16;display:grid;place-items:center;min-height:100vh;padding:18px;text-align:center}
     .card{background:#fffaf2;border:1px solid #e4d8c8;border-radius:22px;padding:18px;max-width:420px;box-shadow:0 8px 22px #0001}
-    a{color:#2f6f5e;font-weight:900}
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Opening Our Shop…</h1>
-    <p>If it does not open automatically, tap below.</p>
-    <p><a id="openLink" href="../live-next/">Open shopping app</a></p>
+    <p>Loading the latest app.</p>
   </div>
   <script>
-    const target = '../live-next/' + (location.search || '') + (location.hash || '');
-    document.getElementById('openLink').href = target;
-    location.replace(target);
+    (async function(){
+      const source = 'https://raw.githubusercontent.com/baggies35/Shopping/bdb54cd8c7227501e0d98578ad4dc7f968413ed0/live-next/index.html';
+      try {
+        let html = await fetch(source, { cache: 'no-store' }).then(r => r.text());
+        html = html
+          .replace('<title>Shopping Next</title>', '<title>Our Shop</title>')
+          .replace('Test version · live-next', 'Shared shopping app')
+          .replace('Current live app stays untouched. These are test links.', 'Copy links for you and Rach.')
+          .replace('Copy Jason test link', 'Copy Jason link')
+          .replace('Copy Rach test link', 'Copy Rach link')
+          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live';")
+          .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()");
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (e) {
+        document.body.innerHTML = '<div class="card"><h1>Could not load app</h1><p>Please refresh.</p></div>';
+      }
+    })();
   </script>
 </body>
 </html>
