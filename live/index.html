@@ -31,12 +31,38 @@
         const livePatch = `
           <script src="config.js"><\/script>
           <script src="sync.js"><\/script>
-          <script src="db-model-fix.js"><\/script>
           <script>
             (function(){
               function clean(v){ return String(v || '').trim(); }
               function lower(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+              function newMealId(){ return 'meal_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
               window.__targetMealIdForIngredient = '';
+
+              function ensureMealIds() {
+                if (!Array.isArray(window.S?.meals)) return;
+                let changed = false;
+                S.meals.forEach(m => {
+                  if (!m.id) { m.id = newMealId(); changed = true; }
+                });
+                if (changed && typeof save === 'function') {
+                  try { save(); } catch(e) { console.warn(e); }
+                }
+              }
+
+              function mealById(id) {
+                ensureMealIds();
+                return Array.isArray(S?.meals) ? S.meals.find(m => m.id === id) || null : null;
+              }
+
+              function mealByName(n) {
+                ensureMealIds();
+                if (!n) return null;
+                if (typeof meal === 'function') {
+                  const found = meal(n);
+                  if (found) return found;
+                }
+                return Array.isArray(S?.meals) ? S.meals.find(m => lower(m.name) === lower(n)) || null : null;
+              }
 
               function currentMealNameCandidate() {
                 const names = [];
@@ -48,19 +74,26 @@
                 return names.find(Boolean) || '';
               }
 
-              function findMealForIngredientAdd() {
-                if (window.shoppingDb) {
-                  if (window.__targetMealIdForIngredient) {
-                    const byId = shoppingDb.findMealById(window.__targetMealIdForIngredient);
-                    if (byId) return byId;
-                  }
-                  const byName = shoppingDb.findMealByName(currentMealNameCandidate());
-                  if (byName) {
-                    window.__targetMealIdForIngredient = byName.id;
-                    return byName;
-                  }
+              function setTargetMealFromName(n) {
+                ensureMealIds();
+                const found = mealByName(n);
+                if (found) {
+                  window.__targetMealIdForIngredient = found.id;
+                  return found;
                 }
                 return null;
+              }
+
+              function findMealForIngredientAdd() {
+                ensureMealIds();
+                if (window.__targetMealIdForIngredient) {
+                  const byId = mealById(window.__targetMealIdForIngredient);
+                  if (byId) return { meal: byId, name: byId.name, id: byId.id };
+                }
+                const candidate = currentMealNameCandidate();
+                const byName = setTargetMealFromName(candidate);
+                if (byName) return { meal: byName, name: byName.name, id: byName.id };
+                return { meal: null, name: candidate || '', id: window.__targetMealIdForIngredient || '' };
               }
 
               function tidyStatusText() {
@@ -79,7 +112,7 @@
               }
 
               function applyLivePatch() {
-                if (window.shoppingDb) shoppingDb.migrateExistingMeals();
+                ensureMealIds();
                 makeHomeMealsOpenPlan();
                 tidyStatusText();
               }
@@ -87,28 +120,21 @@
               const originalEditMeal = window.editMeal;
               if (typeof originalEditMeal === 'function') {
                 window.editMeal = function editMealWithStableId(n) {
-                  if (window.shoppingDb) {
-                    const found = shoppingDb.findMealByName(n);
-                    if (found) window.__targetMealIdForIngredient = found.id;
-                    if (window.shoppingDb.rebuildMealIngredientsForDisplay) window.shoppingDb.rebuildMealIngredientsForDisplay();
-                    return originalEditMeal(found ? found.name : n);
-                  }
-                  return originalEditMeal(n);
+                  const found = setTargetMealFromName(n);
+                  return originalEditMeal(found ? found.name : n);
                 };
               }
 
               const originalOpenIngredientPicker = window.openIngredientPicker;
               window.openIngredientPicker = function openIngredientPickerWithStableMealId() {
-                if (window.shoppingDb) {
-                  const found = shoppingDb.findMealByName(currentMealNameCandidate());
-                  if (found) window.__targetMealIdForIngredient = found.id;
-                }
+                const candidate = currentMealNameCandidate();
+                setTargetMealFromName(candidate);
                 if (typeof originalOpenIngredientPicker === 'function') return originalOpenIngredientPicker();
               };
 
               window.savePickedIngredient = function savePickedIngredientFixed() {
                 try {
-                  if (window.shoppingDb) shoppingDb.migrateExistingMeals();
+                  ensureMealIds();
                   const name = clean(document.getElementById('pickName')?.value);
                   if (!name) { alert('Add an ingredient name first.'); return; }
 
@@ -116,25 +142,37 @@
                   const unit = document.getElementById('pickUnit')?.value || '';
                   const type = document.getElementById('pickType')?.value || 'required';
                   const section = document.getElementById('pickSection')?.value || (typeof sec === 'function' ? sec(name) : 'Cupboard');
-                  const currentMeal = findMealForIngredientAdd();
+                  const ingredient = { name, qty, unit, type, section };
 
+                  const foundMeal = findMealForIngredientAdd();
+                  const currentMeal = foundMeal.meal;
                   if (!currentMeal) {
                     const available = Array.isArray(S?.meals) ? S.meals.map(m => (m.id || 'no-id') + ':' + m.name).join(', ') : 'none';
-                    alert('Could not find the meal to add this to. Available meals: ' + available);
+                    alert('Could not find the meal to add this to. Target id/name was: ' + (foundMeal.id || foundMeal.name || 'blank') + '. Available meals: ' + available);
                     return;
                   }
 
-                  let ingredientRecord;
-                  if (window.shoppingDb) {
-                    ingredientRecord = shoppingDb.getOrCreateIngredient({ name, unit, type, section });
-                    shoppingDb.upsertMealIngredient(currentMeal.id, ingredientRecord, { qty, unit, type, section });
-                    shoppingDb.rebuildMealIngredientsForDisplay();
+                  currentMeal.ingredients = Array.isArray(currentMeal.ingredients) ? currentMeal.ingredients : [];
+                  const alreadyThere = currentMeal.ingredients.some(x => lower(x.name) === lower(name));
+                  if (alreadyThere && !confirm(name + ' is already on this meal. Add it again anyway?')) return;
+
+                  currentMeal.ingredients.push(ingredient);
+                  window.__targetMealIdForIngredient = currentMeal.id;
+
+                  if (Array.isArray(S.masterIngredients)) {
+                    const existing = S.masterIngredients.find(x => lower(x.name) === lower(name));
+                    if (existing) {
+                      existing.qty = existing.qty || qty;
+                      existing.unit = unit || existing.unit || '';
+                      existing.type = type || existing.type || 'required';
+                      existing.section = section || existing.section || 'Cupboard';
+                    } else {
+                      S.masterIngredients.push({ ...ingredient });
+                    }
                   } else {
-                    currentMeal.ingredients = Array.isArray(currentMeal.ingredients) ? currentMeal.ingredients : [];
-                    currentMeal.ingredients.push({ name, qty, unit, type, section });
+                    S.masterIngredients = [{ ...ingredient }];
                   }
 
-                  window.__targetMealIdForIngredient = currentMeal.id;
                   S.finalItems = [];
                   if (typeof closeM === 'function') closeM('ingredientPicker');
                   else document.getElementById('ingredientPicker')?.classList.remove('on');
@@ -151,7 +189,6 @@
               const originalRender = window.render;
               if (typeof originalRender === 'function') {
                 window.render = function patchedRender() {
-                  if (window.shoppingDb) shoppingDb.rebuildMealIngredientsForDisplay();
                   originalRender();
                   setTimeout(applyLivePatch, 0);
                 };
