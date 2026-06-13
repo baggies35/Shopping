@@ -46,9 +46,7 @@
 
         const livePatch = `
           <script src="config.js?b=${BUILD}"><\/script>
-          <script src="sync.js?b=${BUILD}"><\/script>
-          <script src="db-model-fix.js?b=${BUILD}"><\/script>
-          <script src="app-live-patch.js?b=${BUILD}"><\/script>`;
+          <script src="sync.js?b=${BUILD}"><\/script>`;
 
         html = html.replace('</body>', livePatch + '</body>');
         document.open();
