@@ -194,6 +194,37 @@
     return { meal, ingredient:ing, link };
   }
 
+  function removeIngredientFromMeal(mealId, ingredientOrIndex){
+    ensureArrays();
+    ensureMealIds();
+    ensureIngredientIds();
+    const meal = findMealById(mealId);
+    if (!meal) return false;
+    S.mealIngredients.forEach(normaliseJoin);
+    rebuildDisplayIngredients();
+    const displayList = Array.isArray(meal.ingredients) ? meal.ingredients : [];
+    const target = typeof ingredientOrIndex === 'number' ? displayList[ingredientOrIndex] : ingredientOrIndex;
+    if (!target) return false;
+    const targetJoinId = target.mealIngredientId || target.id || '';
+    const targetIngId = target.ingredientId || '';
+    const targetNameKey = key(target.name);
+    const targetType = target.type || 'required';
+
+    const before = S.mealIngredients.length;
+    S.mealIngredients = S.mealIngredients.filter(r => {
+      normaliseJoin(r);
+      if (r.mealId !== meal.id) return true;
+      if (targetJoinId && r.id === targetJoinId) return false;
+      if (targetIngId && r.ingredientId === targetIngId && (r.type || 'required') === targetType) return false;
+      const ing = findIngredientById(r.ingredientId);
+      if (ing && key(ing.name) === targetNameKey && (r.type || 'required') === targetType) return false;
+      return true;
+    });
+
+    rebuildDisplayIngredients();
+    return S.mealIngredients.length !== before;
+  }
+
   window.shoppingDb = {
     migrateOldIngredientsToStructure,
     rebuildDisplayIngredients,
@@ -204,6 +235,7 @@
     getOrCreateIngredient,
     upsertMealIngredient,
     addIngredientToMeal,
+    removeIngredientFromMeal,
     ensureMealIds,
     ensureIngredientIds
   };
