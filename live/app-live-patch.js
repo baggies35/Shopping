@@ -51,6 +51,55 @@
     return findMealByNameFallback(currentMealNameCandidate());
   }
 
+  function getIngredientNameById(id){
+    if (!id || !Array.isArray(S?.ingredients)) return '';
+    const found = S.ingredients.find(x => x.id === id);
+    return found ? found.name : '';
+  }
+
+  function removeIngredientDirect(meal, index){
+    if (!meal) return false;
+    const displayList = Array.isArray(meal.ingredients) ? meal.ingredients : [];
+    const target = displayList[Number(index)];
+    if (!target) return false;
+
+    const targetJoinId = target.mealIngredientId || target.id || '';
+    const targetIngredientId = target.ingredientId || '';
+    const targetNameKey = lower(target.name);
+    const targetType = target.type || 'required';
+    let removed = false;
+
+    if (Array.isArray(S.mealIngredients) && meal.id) {
+      const before = S.mealIngredients.length;
+      S.mealIngredients = S.mealIngredients.filter(row => {
+        const rowMealId = row.mealId || row.meal_id || row.mealID || '';
+        if (rowMealId !== meal.id) return true;
+
+        const rowId = row.id || '';
+        const rowIngredientId = row.ingredientId || row.ingredient_id || row.ingredientID || '';
+        const rowType = row.type || 'required';
+        const rowNameKey = lower(row.name || getIngredientNameById(rowIngredientId));
+
+        if (targetJoinId && rowId === targetJoinId) return false;
+        if (targetIngredientId && rowIngredientId === targetIngredientId && rowType === targetType) return false;
+        if (targetNameKey && rowNameKey === targetNameKey && rowType === targetType) return false;
+        return true;
+      });
+      removed = S.mealIngredients.length !== before;
+    }
+
+    if (!removed && Array.isArray(meal.ingredients)) {
+      meal.ingredients.splice(Number(index), 1);
+      removed = true;
+    }
+
+    if (window.shoppingDb && typeof shoppingDb.rebuildDisplayIngredients === 'function') {
+      shoppingDb.rebuildDisplayIngredients();
+    }
+
+    return removed;
+  }
+
   function tidyStatusText(){
     document.querySelectorAll('#days .pill, #planDays .muted').forEach(el => {
       const t = (el.textContent || '').trim().toLowerCase();
@@ -82,7 +131,7 @@
   }
 
   function applyLivePatch(){
-    if (window.shoppingDb) shoppingDb.migrateOldIngredientsToStructure();
+    if (window.shoppingDb && typeof shoppingDb.migrateOldIngredientsToStructure === 'function') shoppingDb.migrateOldIngredientsToStructure();
     else ensureMealIdsFallback();
     makeHomeMealsOpenPlan();
     tidyStatusText();
@@ -96,7 +145,7 @@
       if (window.shoppingDb) found = shoppingDb.findMealByName(n);
       else found = findMealByNameFallback(n);
       if (found) window.__targetMealIdForIngredient = found.id;
-      if (window.shoppingDb) shoppingDb.rebuildDisplayIngredients();
+      if (window.shoppingDb && typeof shoppingDb.rebuildDisplayIngredients === 'function') shoppingDb.rebuildDisplayIngredients();
       const result = originalEditMeal(found ? found.name : n);
       setTimeout(rewireMealRemoveButtons, 0);
       return result;
@@ -114,7 +163,7 @@
 
   window.savePickedIngredient = function savePickedIngredientFixed(){
     try {
-      if (window.shoppingDb) shoppingDb.migrateOldIngredientsToStructure();
+      if (window.shoppingDb && typeof shoppingDb.migrateOldIngredientsToStructure === 'function') shoppingDb.migrateOldIngredientsToStructure();
       else ensureMealIdsFallback();
 
       const name = clean(document.getElementById('pickName')?.value);
@@ -133,7 +182,7 @@
       }
 
       const raw = { name, qty, unit, type, section };
-      if (window.shoppingDb) shoppingDb.addIngredientToMeal(currentMeal.id, raw);
+      if (window.shoppingDb && typeof shoppingDb.addIngredientToMeal === 'function') shoppingDb.addIngredientToMeal(currentMeal.id, raw);
       else {
         currentMeal.ingredients = Array.isArray(currentMeal.ingredients) ? currentMeal.ingredients : [];
         currentMeal.ingredients.push(raw);
@@ -158,13 +207,9 @@
       const currentMeal = findCurrentMeal();
       if (!currentMeal) { alert('Could not find the meal to remove from.'); return; }
       if (!confirm('Remove ingredient?')) return;
-      const index = Number(i);
 
-      if (window.shoppingDb) {
-        shoppingDb.removeIngredientFromMeal(currentMeal.id, index);
-      } else if (Array.isArray(currentMeal.ingredients)) {
-        currentMeal.ingredients.splice(index, 1);
-      }
+      const removed = removeIngredientDirect(currentMeal, Number(i));
+      if (!removed) { alert('Could not find that ingredient row to remove.'); return; }
 
       S.finalItems = [];
       if (typeof save === 'function') save();
@@ -181,7 +226,7 @@
   const originalRender = window.render;
   if (typeof originalRender === 'function') {
     window.render = function patchedRender(){
-      if (window.shoppingDb) shoppingDb.rebuildDisplayIngredients();
+      if (window.shoppingDb && typeof shoppingDb.rebuildDisplayIngredients === 'function') shoppingDb.rebuildDisplayIngredients();
       originalRender();
       setTimeout(applyLivePatch, 0);
     };
