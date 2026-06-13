@@ -25,14 +25,14 @@
           .replace('Current live app stays untouched. These are test links.', 'Copy links for you and Rach.')
           .replace('Copy Jason test link', 'Copy Jason link')
           .replace('Copy Rach test link', 'Copy Rach link')
-          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live';")
+          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live-20260613-0809';")
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()");
 
         const livePatch = `
-          <script src="config.js"><\/script>
-          <script src="sync.js"><\/script>
-          <script src="db-model-fix.js"><\/script>
-          <script src="app-live-patch.js"><\/script>`;
+          <script src="config.js?v=20260613-0809"><\/script>
+          <script src="sync.js?v=20260613-0809"><\/script>
+          <script src="db-model-fix.js?v=20260613-0809"><\/script>
+          <script src="app-live-patch.js?v=20260613-0809"><\/script>`;
 
         html = html.replace('</body>', livePatch + '</body>');
         document.open();
