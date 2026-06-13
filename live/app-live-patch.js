@@ -66,11 +66,27 @@
     });
   }
 
+  function rewireMealRemoveButtons(){
+    const currentMeal = findCurrentMeal();
+    if (!currentMeal || !Array.isArray(currentMeal.ingredients)) return;
+    const mealBody = document.getElementById('mealBody');
+    if (!mealBody) return;
+    const buttons = [...mealBody.querySelectorAll('button')].filter(b => (b.textContent || '').trim().toLowerCase() === 'remove');
+    buttons.forEach((button, index) => {
+      button.onclick = function(ev){
+        if (ev) ev.preventDefault();
+        window.liveRemoveIngredient(index);
+        return false;
+      };
+    });
+  }
+
   function applyLivePatch(){
     if (window.shoppingDb) shoppingDb.migrateOldIngredientsToStructure();
     else ensureMealIdsFallback();
     makeHomeMealsOpenPlan();
     tidyStatusText();
+    rewireMealRemoveButtons();
   }
 
   const originalEditMeal = window.editMeal;
@@ -81,7 +97,9 @@
       else found = findMealByNameFallback(n);
       if (found) window.__targetMealIdForIngredient = found.id;
       if (window.shoppingDb) shoppingDb.rebuildDisplayIngredients();
-      return originalEditMeal(found ? found.name : n);
+      const result = originalEditMeal(found ? found.name : n);
+      setTimeout(rewireMealRemoveButtons, 0);
+      return result;
     };
   }
 
@@ -135,14 +153,18 @@
     }
   };
 
-  window.delIng = function deleteIngredientFixed(i){
+  window.liveRemoveIngredient = function liveRemoveIngredient(i){
     try {
       const currentMeal = findCurrentMeal();
       if (!currentMeal) { alert('Could not find the meal to remove from.'); return; }
       if (!confirm('Remove ingredient?')) return;
+      const index = Number(i);
 
-      if (window.shoppingDb) shoppingDb.removeIngredientFromMeal(currentMeal.id, Number(i));
-      else if (Array.isArray(currentMeal.ingredients)) currentMeal.ingredients.splice(Number(i), 1);
+      if (window.shoppingDb) {
+        shoppingDb.removeIngredientFromMeal(currentMeal.id, index);
+      } else if (Array.isArray(currentMeal.ingredients)) {
+        currentMeal.ingredients.splice(index, 1);
+      }
 
       S.finalItems = [];
       if (typeof save === 'function') save();
@@ -153,6 +175,8 @@
       alert('Could not remove ingredient. I have logged the error in the browser console.');
     }
   };
+
+  window.delIng = window.liveRemoveIngredient;
 
   const originalRender = window.render;
   if (typeof originalRender === 'function') {
