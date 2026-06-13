@@ -20,6 +20,27 @@
   <script>
     (async function(){
       const BUILD = String(Date.now());
+      const errorReporter = `
+        <script>
+          (function(){
+            function showError(context, error, extra){
+              const msg = error && error.message ? error.message : String(error || 'Unknown error');
+              const stack = error && error.stack ? error.stack : '';
+              const text = ['Context: '+context, 'Message: '+msg, extra ? 'Extra: '+extra : '', stack ? 'Stack: '+stack : ''].filter(Boolean).join('\\n\\n');
+              let box = document.getElementById('visibleErrorBox');
+              if (!box) {
+                box = document.createElement('div');
+                box.id = 'visibleErrorBox';
+                box.style.cssText = 'position:fixed;left:10px;right:10px;bottom:10px;z-index:999999;background:#fff1f1;border:2px solid #b84b4b;border-radius:16px;padding:12px;color:#1e1b16;font-family:system-ui;max-height:45vh;overflow:auto;text-align:left;box-shadow:0 8px 28px #0004';
+                document.body.appendChild(box);
+              }
+              box.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>App error</b><button onclick="document.getElementById(\\'visibleErrorBox\\').remove()" style="border:0;border-radius:10px;padding:7px 10px;font-weight:900">Close</button></div><pre style="white-space:pre-wrap;font-size:12px;line-height:1.25;margin:10px 0 0">'+text.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</pre>';
+            }
+            window.addEventListener('error', function(ev){ showError('window.error', ev.error || ev.message, (ev.filename||'')+':'+(ev.lineno||'')+':'+(ev.colno||'')); });
+            window.addEventListener('unhandledrejection', function(ev){ showError('unhandled promise rejection', ev.reason); });
+          })();
+        <\/script>`;
+
       try {
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
@@ -48,7 +69,7 @@
           <script src="config.js?b=${BUILD}"><\/script>
           <script src="sync.js?b=${BUILD}"><\/script>`;
 
-        html = html.replace('</body>', livePatch + '</body>');
+        html = html.replace('</body>', errorReporter + livePatch + '</body>');
         document.open();
         document.write(html);
         document.close();
