@@ -61,7 +61,7 @@
           .replace('Current live app stays untouched. These are test links.', 'Copy links for you and Rach.')
           .replace('Copy Jason test link', 'Copy Jason link')
           .replace('Copy Rach test link', 'Copy Rach link')
-          .replace("const STORE='shopping-live';const BUILD='live-next-1';", "const STORE='shopping-live';const BUILD='live-' + BUILD;")
+          .replace("const STORE='shopping-live';const BUILD='live-next-1';let S,pi=0,dayIx=0,mealName='',editIx=null,shopIx=null,weeklyIx=null,masterKey=null,finalIx=null,editMode='',setupMode='meals',shopMode='need';", "const STORE='shopping-live';const BUILD='live-' + BUILD;var S,pi=0,dayIx=0,mealName='',editIx=null,shopIx=null,weeklyIx=null,masterKey=null,finalIx=null,editMode='',setupMode='meals',shopMode='need';")
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()")
           .replace('load();', 'load();window.S=S;');
 
