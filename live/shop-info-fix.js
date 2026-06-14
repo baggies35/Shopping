@@ -3,13 +3,6 @@
   function lower(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
   function title(v){ return String(v || '').replace(/\b\w/g, c => c.toUpperCase()); }
 
-  function itemNameFromText(text){
-    text = clean(text);
-    return text
-      .replace(/^\d+(\.\d+)?\s*(g|kg|ml|l|pack|packs|tin|tins|tub|tubs|each|tbsp|tsp|cloves|loaf|pints)?\s+/i, '')
-      .trim();
-  }
-
   function mealNameForDay(day){
     try {
       if (!day) return '';
@@ -29,7 +22,9 @@
     const itemKey = lower(itemName);
 
     if (item && item.source && item.source !== 'Manual' && item.source !== 'Weekly') {
-      String(item.source).split(',').map(clean).filter(Boolean).forEach(x => names.push(x));
+      String(item.source).split(',').map(clean).filter(Boolean).forEach(x => {
+        if (!names.some(n => lower(n) === lower(x))) names.push(x);
+      });
     }
 
     try {
@@ -62,51 +57,9 @@
     }
   }
 
-  function addTapHandlers(){
-    try {
-      const rows = [...document.querySelectorAll('#list .item')];
-      rows.forEach(row => {
-        if (row.dataset.mealInfoHooked === '1') return;
-        row.dataset.mealInfoHooked = '1';
-        row.style.cursor = 'pointer';
-        row.addEventListener('click', function(ev){
-          if (ev && ev.target && ev.target.closest && ev.target.closest('.check')) return;
-          const text = clean(row.textContent).replace('✓','');
-          const nameGuess = itemNameFromText(text);
-          let idx = -1;
-          if (Array.isArray(S?.items)) {
-            idx = S.items.findIndex(i => lower(i.name) === lower(nameGuess));
-            if (idx < 0) idx = S.items.findIndex(i => lower(text).includes(lower(i.name)));
-          }
-          if (idx >= 0) showShoppingItemInfo(idx);
-        });
-      });
-    } catch(e) { console.warn('shop item info hook failed', e); }
-  }
-
   const previousShowItemInfo = window.showItemInfo;
   window.showItemInfo = function showItemInfoWithMeals(index){
     if (Array.isArray(S?.items) && S.items[index]) return showShoppingItemInfo(index);
     if (typeof previousShowItemInfo === 'function') return previousShowItemInfo(index);
   };
-
-  const originalRenderShop = window.renderShop;
-  if (typeof originalRenderShop === 'function') {
-    window.renderShop = function renderShopWithMealInfo(){
-      const result = originalRenderShop();
-      setTimeout(addTapHandlers, 20);
-      return result;
-    };
-  }
-
-  const originalGo = window.go;
-  if (typeof originalGo === 'function') {
-    window.go = function goWithShopItemInfo(screenName){
-      const result = originalGo(screenName);
-      if (screenName === 'shop') setTimeout(addTapHandlers, 50);
-      return result;
-    };
-  }
-
-  setTimeout(addTapHandlers, 300);
 })();
