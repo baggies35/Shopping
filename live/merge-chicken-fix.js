@@ -1,10 +1,9 @@
 (() => {
-  const FROM = 'chicken loose';
-  const TO = 'chicken';
+  const FROM = 'chicken';
+  const TO = 'chicken loose';
 
   function clean(v){ return String(v || '').trim(); }
   function lower(v){ return clean(v).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-  function nice(v){ return clean(v).replace(/\b\w/g, c => c.toUpperCase()); }
   function sameName(v, target){ return lower(v) === lower(target); }
   function numeric(v){ const n = Number(String(v || '').trim()); return Number.isFinite(n) ? n : null; }
 
