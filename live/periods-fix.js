@@ -14,15 +14,20 @@
     x.setDate(x.getDate() + n);
     return x;
   };
-  const daysBetweenInclusive = (start, end) => Math.max(1, Math.min(31, Math.round((end - start) / 86400000) + 1));
-  const dayLabel = (d) => d.toLocaleDateString('en-GB', { weekday: 'short' });
+  const diffDaysInclusive = (start, end) => Math.round((new Date(end.getFullYear(), end.getMonth(), end.getDate()) - new Date(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000) + 1;
   const shortDate = (d) => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const dayName = (d) => d.toLocaleDateString('en-GB', { weekday: 'short' });
   const labelFromDates = (start, end) => `${shortDate(start)} - ${shortDate(end)}`;
-  const blankDays = (start = null, end = null) => {
-    if (!start || !end) return DAY_NAMES.map(day => ({ day, meal: null, status: null }));
-    return Array.from({ length: daysBetweenInclusive(start, end) }, (_, i) => {
-      const d = addDays(start, i);
-      return { day: dayLabel(d), date: iso(d), meal: null, status: null };
+  const blankDays = () => DAY_NAMES.map(day => ({ day, meal: null, status: null }));
+
+  const daysForDates = (start, end, existing = []) => {
+    let count = diffDaysInclusive(start, end);
+    if (!Number.isFinite(count) || count < 1) count = 7;
+    if (count > 31) count = 31;
+    return Array.from({ length: count }, (_, i) => {
+      const old = existing[i] || {};
+      const date = addDays(start, i);
+      return { ...old, day: dayName(date), date: iso(date) };
     });
   };
 
@@ -30,6 +35,7 @@
     const text = String(label || '').replace(/[–—]/g, '-');
     const parts = text.split('-').map(x => x.trim());
     if (parts.length < 2) return null;
+
     const currentYear = new Date().getFullYear();
     const parsePart = (part, fallbackMonth = null) => {
       const tokens = part.toLowerCase().replace(/,/g, '').split(/\s+/).filter(Boolean);
@@ -40,6 +46,7 @@
       if (month === null || month === undefined) return null;
       return new Date(currentYear, month, Number(dayToken));
     };
+
     const start = parsePart(parts[0]);
     if (!start) return null;
     let end = parsePart(parts[1], start.getMonth());
@@ -91,34 +98,23 @@
     return null;
   };
 
-  const alignDaysToDates = (period) => {
-    const dates = inferDates(period);
-    if (!dates) {
-      if (!Array.isArray(period.days) || !period.days.length) period.days = blankDays();
-      return;
-    }
-    const required = daysBetweenInclusive(dates.start, dates.end);
-    const existing = Array.isArray(period.days) ? period.days : [];
-    const next = [];
-    for (let i = 0; i < required; i++) {
-      const d = addDays(dates.start, i);
-      const old = existing[i] || {};
-      next.push({ ...old, day: dayLabel(d), date: iso(d) });
-    }
-    period.days = next;
-    period.label = labelFromDates(dates.start, dates.end);
-  };
-
   const normalisePeriods = () => {
     if (!S.periods || !S.periods.length) {
       const today = new Date();
       const end = addDays(today, 6);
-      S.periods = [{ label: labelFromDates(today, end), startDate: iso(today), endDate: iso(end), createdAt: Date.now(), days: blankDays(today, end) }];
+      S.periods = [{ label: labelFromDates(today, end), startDate: iso(today), endDate: iso(end), createdAt: Date.now(), days: daysForDates(today, end) }];
     }
     S.periods.forEach((p, i) => {
+      if (!Array.isArray(p.days) || !p.days.length) p.days = blankDays();
       if (!p.createdAt) p.createdAt = Date.now() + i;
       if (!p.label) p.label = i === 0 ? 'This shop' : `Shop ${i + 1}`;
-      alignDaysToDates(p);
+      const dates = inferDates(p);
+      if (dates) {
+        p.label = labelFromDates(dates.start, dates.end);
+        p.startDate = iso(dates.start);
+        p.endDate = iso(dates.end);
+        p.days = daysForDates(dates.start, dates.end, p.days);
+      }
     });
     if (typeof pi !== 'number' || pi < 0 || pi >= S.periods.length) pi = 0;
   };
@@ -126,6 +122,7 @@
   const openCreatePeriodPicker = () => {
     normalisePeriods();
     ensureModal();
+
     const modal = document.getElementById('periodPicker');
     const currentEndWrap = document.getElementById('currentEndWrap');
     const currentEndInput = document.getElementById('currentEndDate');
@@ -133,9 +130,11 @@
     const endInput = document.getElementById('nextEndDate');
     const cancel = document.getElementById('periodCancel');
     const create = document.getElementById('periodCreate');
+
     const current = S.periods[pi];
     const dates = inferDates(current);
     let suggestedStart;
+
     if (dates) {
       currentEndWrap.style.display = 'none';
       suggestedStart = addDays(dates.end, 1);
@@ -145,8 +144,10 @@
       currentEndInput.value = current.endDate || iso(fallbackEnd);
       suggestedStart = addDays(parseIso(currentEndInput.value) || fallbackEnd, 1);
     }
+
     startInput.value = iso(suggestedStart);
     endInput.value = iso(addDays(suggestedStart, 6));
+
     currentEndInput.onchange = () => {
       const end = parseIso(currentEndInput.value);
       if (end) {
@@ -155,10 +156,12 @@
         endInput.value = iso(addDays(nextStart, 6));
       }
     };
+
     startInput.onchange = () => {
       const start = parseIso(startInput.value);
       if (start) endInput.value = iso(addDays(start, 6));
     };
+
     cancel.onclick = () => modal.classList.remove('on');
     create.onclick = () => {
       if (!dates) {
@@ -167,18 +170,20 @@
         current.endDate = iso(currentEnd);
         if (!current.startDate) current.startDate = iso(addDays(currentEnd, -6));
         current.label = labelFromDates(parseIso(current.startDate), currentEnd);
-        alignDaysToDates(current);
+        current.days = daysForDates(parseIso(current.startDate), currentEnd, current.days);
       }
+
       const start = parseIso(startInput.value);
       const end = parseIso(endInput.value);
       if (!start || !end) return alert('Please pick a start and end date.');
       if (end < start) return alert('End date cannot be before start date.');
+
       S.periods.push({
         label: labelFromDates(start, end),
         startDate: iso(start),
         endDate: iso(end),
         createdAt: Date.now(),
-        days: blankDays(start, end)
+        days: daysForDates(start, end)
       });
       pi = S.periods.length - 1;
       S.currentPeriod = pi;
@@ -187,11 +192,13 @@
       if (typeof save === 'function') save();
       if (typeof render === 'function') render();
     };
+
     modal.classList.add('on');
   };
 
   window.move = function movePeriod(direction) {
     normalisePeriods();
+
     if (direction > 0) {
       if (pi < S.periods.length - 1) pi += 1;
       else { openCreatePeriodPicker(); return; }
@@ -199,19 +206,21 @@
       if (pi > 0) pi -= 1;
       else { alert('No previous shopping period yet.'); return; }
     }
-    normalisePeriods();
+
     S.currentPeriod = pi;
     S.finalItems = [];
+    normalisePeriods();
     if (typeof save === 'function') save();
     if (typeof render === 'function') render();
   };
 
-  const oldRender = window.render;
-  if (typeof oldRender === 'function') {
-    window.render = function patchedRender() {
+  if (window.S || typeof S !== 'undefined') {
+    try {
       normalisePeriods();
       if (typeof save === 'function') save();
-      return oldRender.apply(this, arguments);
-    };
+      if (typeof render === 'function') render();
+    } catch (e) {
+      console.warn('Period date normalise skipped', e);
+    }
   }
 })();
