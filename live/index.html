@@ -66,9 +66,36 @@
           .replace("location.origin+location.pathname.replace(/\\/index.html$/,'')+'#'+name.toLowerCase()", "location.origin+location.pathname.replace('/live-next/','/live/').replace(/\\/index.html$/,'')+'#'+name.toLowerCase()")
           .replace('load();', 'load();window.S=S;');
 
+        const dayRenderFix = `
+          <script>
+            (function(){
+              function pad(n){return String(n).padStart(2,'0')}
+              function iso(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+              function parseIso(s){var m=String(s||'').match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);if(!m)return null;var d=new Date(+m[1],+m[2]-1,+m[3]);return isNaN(d.getTime())?null:d}
+              function addDays(d,n){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x}
+              function dayName(d){return d.toLocaleDateString('en-GB',{weekday:'short'})}
+              function shortDate(d){return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}
+              function fixDays(){
+                if(typeof S==='undefined'||!S||!S.periods||typeof pi!=='number'||!S.periods[pi])return;
+                var p=S.periods[pi], s=parseIso(p.startDate), e=parseIso(p.endDate);
+                if(!s||!e)return;
+                var count=Math.round((new Date(e.getFullYear(),e.getMonth(),e.getDate())-new Date(s.getFullYear(),s.getMonth(),s.getDate()))/86400000)+1;
+                if(!isFinite(count)||count<1)count=7;if(count>31)count=31;
+                var old=Array.isArray(p.days)?p.days:[];
+                p.days=Array.from({length:count},function(_,i){var d=addDays(s,i), prev=old[i]||{};return Object.assign({},prev,{day:dayName(d),date:iso(d)})});
+                p.label=shortDate(s)+' - '+shortDate(e);
+              }
+              function wrap(name){var old=window[name];if(typeof old!=='function')return;window[name]=function(){fixDays();return old.apply(this,arguments)}}
+              ['render','renderPlan','renderFinal','renderShop','openDay','createList'].forEach(wrap);
+              var oldMove=window.move;if(typeof oldMove==='function'){window.move=function(){var r=oldMove.apply(this,arguments);fixDays();if(typeof window.render==='function')window.render();return r}}
+              fixDays();if(typeof window.save==='function')window.save();if(typeof window.render==='function')window.render();
+            })();
+          <\/script>`;
+
         const livePatch = `
           <script src="config.js?b=${BUILD}"><\/script>
           <script src="periods-fix.js?b=${BUILD}"><\/script>
+          ${dayRenderFix}
           <script src="nav-fix.js?b=${BUILD}"><\/script>
           <script src="quantity-fix.js?b=${BUILD}"><\/script>
           <script src="weekly-fix.js?b=${BUILD}"><\/script>
