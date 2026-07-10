@@ -28,6 +28,24 @@
     catch { return 'Cupboard'; }
   };
 
+  const periodKey = (p) => [p?.startDate || '', p?.endDate || '', p?.createdAt || ''].join('|');
+
+  const mergePeriods = (localPeriods = [], remotePeriods = []) => {
+    const merged = [];
+    const seen = new Set();
+    [...remotePeriods, ...localPeriods]
+      .filter(Boolean)
+      .sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')) || Number(a.createdAt || 0) - Number(b.createdAt || 0))
+      .forEach(p => {
+        const key = periodKey(p);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(p);
+        }
+      });
+    return merged;
+  };
+
   const normalise = (state) => {
     const currentUser = (typeof me === 'function') ? me() : (state.user || 'Jason');
     state.user = currentUser;
@@ -77,30 +95,31 @@
   let loadedRemote = false;
 
   const saveRemote = async () => {
-    if (!loadedRemote || typeof S === 'undefined') return;
+    if (!loadedRemote || typeof S === 'undefined') return false;
     if (saving) {
       pendingSave = true;
-      return;
+      return false;
     }
 
     saving = true;
     pendingSave = false;
     try {
+      const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
+      if (remote && Array.isArray(remote.periods)) {
+        S.periods = mergePeriods(S.periods, remote.periods);
+        if (typeof pi === 'number') {
+          pi = Math.min(Math.max(pi, 0), S.periods.length - 1);
+          S.currentPeriod = pi;
+        }
+      }
       await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
+      localStorage.setItem('shopping-live', JSON.stringify(S));
       setStatus(syncText());
+      return true;
     } catch (e) {
       console.warn(e);
-      try {
-        const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
-        if (remote && Array.isArray(remote.periods) && remote.periods.length) {
-          setStatus(syncText());
-        } else {
-          setStatus('Sync save failed. Still saved on this phone.');
-        }
-      } catch (e2) {
-        console.warn(e2);
-        setStatus('Sync save failed. Still saved on this phone.');
-      }
+      setStatus('Sync save failed. Still saved on this phone.');
+      return false;
     } finally {
       saving = false;
       if (pendingSave) {
@@ -121,29 +140,50 @@
     queueSave();
   };
 
-  const loadRemote = async () => {
-    setStatus('Loading shared live list...');
+  const loadRemote = async ({ mergeOnly = false } = {}) => {
+    if (!mergeOnly) setStatus('Loading shared live list...');
     try {
       const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
       if (remote && Object.keys(remote).length) {
-        S = normalise(remote);
-        pi = Math.min(S.currentPeriod || 0, S.periods.length - 1);
-        localStorage.setItem('shopping-live', JSON.stringify(S));
-        if (typeof render === 'function') render();
-        setStatus(`Loaded shared live list · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
-      } else {
+        if (mergeOnly && typeof S !== 'undefined') {
+          const before = Array.isArray(S.periods) ? S.periods.length : 0;
+          S.periods = mergePeriods(S.periods, remote.periods || []);
+          if (S.periods.length !== before) {
+            localStorage.setItem('shopping-live', JSON.stringify(S));
+            if (typeof render === 'function') render();
+          }
+        } else {
+          S = normalise(remote);
+          pi = Math.min(S.currentPeriod || 0, S.periods.length - 1);
+          localStorage.setItem('shopping-live', JSON.stringify(S));
+          if (typeof render === 'function') render();
+          setStatus(`Loaded shared live list · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
+        }
+      } else if (!mergeOnly) {
         setStatus('No shared list yet. This phone will create it.');
         await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
         setStatus(syncText());
       }
       loadedRemote = true;
+      return true;
     } catch (e) {
       loadedRemote = true;
-      setStatus('Sync load failed. Using this phone only.');
+      if (!mergeOnly) setStatus('Sync load failed. Using this phone only.');
       console.warn(e);
+      return false;
     }
   };
 
-  window.refreshSharedList = loadRemote;
+  window.refreshSharedList = () => loadRemote();
+  window.saveSharedNow = saveRemote;
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) loadRemote({ mergeOnly: true });
+  });
+  window.addEventListener('focus', () => loadRemote({ mergeOnly: true }));
+  setInterval(() => {
+    if (!document.hidden && !saving) loadRemote({ mergeOnly: true });
+  }, 15000);
+
   loadRemote();
 })();
