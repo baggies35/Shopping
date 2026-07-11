@@ -34,7 +34,7 @@ jobs:
           };
           EOF
           python - <<'PY'
-          from pathlib import import Path
+          from pathlib import Path
           import re
           p = Path('live/index.html')
           s = p.read_text()
