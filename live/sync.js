@@ -37,7 +37,7 @@
   const mergePeriods = (localPeriods = [], remotePeriods = []) => {
     const merged = [];
     const seen = new Set();
-    [...remotePeriods, ...localPeriods]
+    [...localPeriods, ...remotePeriods]
       .filter(Boolean)
       .sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')) || Number(a.createdAt || 0) - Number(b.createdAt || 0))
       .forEach(p => {
