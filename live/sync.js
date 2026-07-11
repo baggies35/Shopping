@@ -19,8 +19,12 @@
       },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(`${name} failed ${res.status}`);
-    return res.json();
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`${name} failed ${res.status}${detail ? `: ${detail}` : ''}`);
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   };
 
   const getSection = (name) => {
