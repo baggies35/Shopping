@@ -3,6 +3,7 @@
   const normText = s => String(s || '').toLowerCase().trim();
   const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let selectedQuickIngredient = null;
+  const setupSearchText = { meals: '', ingredients: '', weekly: '' };
 
   function ingredientLibrary() {
     const map = new Map();
@@ -166,27 +167,83 @@
     tiles.insertBefore(btn, tiles.children[1] || null);
   }
 
-  function installIngredientSearch() {
-    if (typeof window.renderIngredientsSetup !== 'function' || window.__ingredientSearchInstalled) return;
-    window.__ingredientSearchInstalled = true;
-    const original = window.renderIngredientsSetup;
-    window.renderIngredientsSetup = function() {
-      const result = original.apply(this, arguments), body = $('setupBody');
-      if (!body || $('ingredientSetupSearch')) return result;
-      const wrap = document.createElement('div'); wrap.className = 'card';
-      wrap.innerHTML = '<b>Search ingredients</b><div class="fieldLabel">Ingredient name</div><input id="ingredientSetupSearch" placeholder="Start typing, e.g. squash"><div class="hint" id="ingredientSearchCount"></div>';
-      body.insertBefore(wrap, body.firstChild);
-      const input = $('ingredientSetupSearch');
-      input.oninput = () => {
-        const q = normText(input.value), rows = [...body.querySelectorAll('.item')]; let shown = 0;
-        rows.forEach(row => { const match = !q || normText(row.textContent).includes(q); row.style.display = match ? '' : 'none'; if (match) shown++; });
-        $('ingredientSearchCount').textContent = q ? `${shown} match${shown === 1 ? '' : 'es'}` : `${rows.length} ingredients`;
-      };
-      input.oninput(); return result;
+  function activeSetupMode() {
+    if ($('setupMealsBtn')?.classList.contains('on')) return 'meals';
+    if ($('setupIngredientsBtn')?.classList.contains('on')) return 'ingredients';
+    if ($('setupWeeklyBtn')?.classList.contains('on')) return 'weekly';
+    return typeof setupMode === 'string' ? setupMode : 'meals';
+  }
+
+  function applySetupSearch(mode) {
+    const body = $('setupBody');
+    const input = $('setupUniversalSearch');
+    const count = $('setupSearchCount');
+    if (!body || !input || !count) return;
+    const q = normText(input.value);
+    setupSearchText[mode] = input.value;
+    const rows = [...body.querySelectorAll('.item')];
+    let shown = 0;
+    rows.forEach(row => {
+      const match = !q || normText(row.textContent).includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    count.textContent = q ? `${shown} match${shown === 1 ? '' : 'es'}` : `${rows.length} ${mode}`;
+  }
+
+  function addSetupSearch() {
+    const body = $('setupBody');
+    if (!body) return;
+    const mode = activeSetupMode();
+    const old = $('setupSearchCard');
+    if (old) old.remove();
+
+    const wrap = document.createElement('div');
+    wrap.id = 'setupSearchCard';
+    wrap.className = 'card';
+    wrap.style.position = 'sticky';
+    wrap.style.top = '8px';
+    wrap.style.zIndex = '5';
+    wrap.innerHTML = `<b>Search ${mode}</b><div class="fieldLabel">Name or details</div><div class="row"><input id="setupUniversalSearch" placeholder="Search ${mode}..." value="${esc(setupSearchText[mode] || '')}"><button type="button" class="btn alt small" id="setupSearchClear">Clear</button></div><div class="hint" id="setupSearchCount"></div>`;
+    body.insertBefore(wrap, body.firstChild);
+    $('setupUniversalSearch').oninput = () => applySetupSearch(mode);
+    $('setupSearchClear').onclick = () => {
+      $('setupUniversalSearch').value = '';
+      applySetupSearch(mode);
+      $('setupUniversalSearch').focus();
     };
+    applySetupSearch(mode);
+  }
+
+  function wrapSetupRenderer(name) {
+    const original = window[name];
+    if (typeof original !== 'function' || original.__searchWrapped) return;
+    const wrapped = function() {
+      const result = original.apply(this, arguments);
+      setTimeout(addSetupSearch, 0);
+      return result;
+    };
+    wrapped.__searchWrapped = true;
+    window[name] = wrapped;
+  }
+
+  function installSetupSearches() {
+    wrapSetupRenderer('renderSetup');
+    wrapSetupRenderer('renderIngredientsSetup');
+    wrapSetupRenderer('renderWeeklySetup');
+    setTimeout(addSetupSearch, 0);
   }
 
   const oldRender = window.render;
-  if (typeof oldRender === 'function') window.render = function() { const r = oldRender.apply(this, arguments); addQuickAddTile(); installIngredientSearch(); return r; };
-  addQuickAddTile(); installIngredientSearch();
+  if (typeof oldRender === 'function') {
+    window.render = function() {
+      const r = oldRender.apply(this, arguments);
+      addQuickAddTile();
+      installSetupSearches();
+      return r;
+    };
+  }
+
+  addQuickAddTile();
+  installSetupSearches();
 })();
