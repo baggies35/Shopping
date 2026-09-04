@@ -97,6 +97,31 @@
   let pendingSave = false;
   let saveTimer = null;
   let loadedRemote = false;
+  let localDirty = false;
+
+  const canonical = (value) => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') {
+      return Object.keys(value).sort().reduce((out, key) => {
+        out[key] = canonical(value[key]);
+        return out;
+      }, {});
+    }
+    return value;
+  };
+
+  const sameState = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+
+  const adoptRemote = (remote) => {
+    const viewedPeriod = (typeof pi === 'number' && S?.periods?.[pi]) ? periodKey(S.periods[pi]) : '';
+    S = normalise(remote);
+    const viewedIndex = viewedPeriod ? S.periods.findIndex(p => periodKey(p) === viewedPeriod) : -1;
+    pi = viewedIndex >= 0 ? viewedIndex : Math.min(S.currentPeriod || 0, S.periods.length - 1);
+    S.currentPeriod = Math.max(pi, 0);
+    window.S = S;
+    localStorage.setItem('shopping-live', JSON.stringify(S));
+    if (typeof render === 'function') render();
+  };
 
   const saveRemote = async () => {
     if (!loadedRemote || typeof S === 'undefined') return false;
@@ -117,7 +142,10 @@
         }
       }
       await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
+      const confirmed = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
+      if (!sameState(confirmed, S)) throw new Error('Saved state could not be verified');
       localStorage.setItem('shopping-live', JSON.stringify(S));
+      localDirty = false;
       setStatus(syncText());
       return true;
     } catch (e) {
@@ -141,6 +169,7 @@
   const localSave = save;
   save = function syncedSave() {
     localSave();
+    localDirty = true;
     queueSave();
   };
 
@@ -150,17 +179,15 @@
       const remote = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
       if (remote && Object.keys(remote).length) {
         if (mergeOnly && typeof S !== 'undefined') {
-          const before = Array.isArray(S.periods) ? S.periods.length : 0;
-          S.periods = mergePeriods(S.periods, remote.periods || []);
-          if (S.periods.length !== before) {
-            localStorage.setItem('shopping-live', JSON.stringify(S));
-            if (typeof render === 'function') render();
-          }
+          // Never overwrite a local edit that is still being saved. Otherwise the
+          // database is authoritative: changes inside an existing week must be
+          // applied too, not just newly-created weeks.
+          if (localDirty || saving) return false;
+          adoptRemote(remote);
+          setStatus(syncText());
         } else {
-          S = normalise(remote);
-          pi = Math.min(S.currentPeriod || 0, S.periods.length - 1);
-          localStorage.setItem('shopping-live', JSON.stringify(S));
-          if (typeof render === 'function') render();
+          adoptRemote(remote);
+          localDirty = false;
           setStatus(`Loaded shared live list · ${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`);
         }
       } else if (!mergeOnly) {
