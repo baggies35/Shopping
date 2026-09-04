@@ -32,7 +32,45 @@
     catch { return 'Cupboard'; }
   };
 
-  const periodKey = (p) => [p?.startDate || '', p?.endDate || '', p?.createdAt || ''].join('|');
+  // A shopping week is identified by its displayed date range. createdAt is not
+  // part of its identity: two phones can create the same week milliseconds apart.
+  const periodKey = (p) => {
+    const start = p?.startDate || '';
+    const end = p?.endDate || '';
+    return (start || end) ? `${start}|${end}` : `created|${p?.createdAt || ''}`;
+  };
+
+  const mergeMissingPeriodData = (primary, duplicate) => {
+    const out = { ...duplicate, ...primary };
+    const a = Array.isArray(primary?.days) ? primary.days : [];
+    const b = Array.isArray(duplicate?.days) ? duplicate.days : [];
+    out.days = Array.from({ length: Math.max(a.length, b.length) }, (_, i) => {
+      const preferred = a[i] || {};
+      const fallback = b[i] || {};
+      const day = { ...fallback, ...preferred };
+      Object.keys(fallback).forEach(key => {
+        if (day[key] == null || day[key] === '') day[key] = fallback[key];
+      });
+      return day;
+    });
+    return out;
+  };
+
+  const dedupePeriods = (periods = [], selectedIndex = 0) => {
+    const selected = periods[selectedIndex];
+    const selectedKey = periodKey(selected);
+    const groups = new Map();
+    periods.filter(Boolean).forEach(p => {
+      const key = periodKey(p);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    });
+    const result = [...groups.entries()].map(([key, copies]) => {
+      const preferred = key === selectedKey && selected ? selected : copies[0];
+      return copies.filter(p => p !== preferred).reduce(mergeMissingPeriodData, preferred);
+    }).sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')) || Number(a.createdAt || 0) - Number(b.createdAt || 0));
+    return { periods: result, currentPeriod: Math.max(0, result.findIndex(p => periodKey(p) === selectedKey)) };
+  };
 
   const mergePeriods = (localPeriods = [], remotePeriods = []) => {
     const merged = [];
@@ -54,6 +92,9 @@
     const currentUser = (typeof me === 'function') ? me() : (state.user || 'Jason');
     state.user = currentUser;
     state.periods = Array.isArray(state.periods) && state.periods.length ? state.periods : S.periods;
+    const deduped = dedupePeriods(state.periods, Number(state.currentPeriod || 0));
+    state.periods = deduped.periods;
+    state.currentPeriod = deduped.currentPeriod;
     state.meals = Array.isArray(state.meals) && state.meals.length ? state.meals : S.meals;
     state.items = Array.isArray(state.items) ? state.items : [];
     state.weekly = Array.isArray(state.weekly) ? state.weekly : [];
