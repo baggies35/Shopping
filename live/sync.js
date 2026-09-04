@@ -140,19 +140,6 @@
   let loadedRemote = false;
   let localDirty = false;
 
-  const canonical = (value) => {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === 'object') {
-      return Object.keys(value).sort().reduce((out, key) => {
-        out[key] = canonical(value[key]);
-        return out;
-      }, {});
-    }
-    return value;
-  };
-
-  const sameState = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
-
   const adoptRemote = (remote) => {
     const viewedPeriod = (typeof pi === 'number' && S?.periods?.[pi]) ? periodKey(S.periods[pi]) : '';
     S = normalise(remote);
@@ -183,8 +170,6 @@
         }
       }
       await rpc('public_save_live_app_state', { p_app_key: cfg.appKey, p_state: S });
-      const confirmed = await rpc('public_get_live_app_state', { p_app_key: cfg.appKey });
-      if (!sameState(confirmed, S)) throw new Error('Saved state could not be verified');
       localStorage.setItem('shopping-live', JSON.stringify(S));
       localDirty = false;
       setStatus(syncText());
