@@ -1,11 +1,13 @@
 (function(){
   'use strict';
-  const categories=['All meals','Pasta','Chicken & Rice','Mexican & Takeaway','Comfort Food','Quick & Easy','Roasts','Fish & Seafood'];
+  const categories=['All meals','Pasta','Chicken & Rice','Mexican & Takeaway','Comfort Food','Winter Warmers','Luxury & Treats','Quick & Easy','Roasts','Fish & Seafood'];
   const assigned={
     'Pasta':['Spag bol','Prawn pasta','pasta bake','lasagne','Spaghetti Carbonara','Creamy Chicken & Bacon Pasta','Macaroni Cheese with Bacon','Chicken Fajita Pasta','BBQ Chicken Pasta Bake','Cheeseburger Pasta','Chicken & Spinach Pasta','Bacon & Mushroom Tagliatelle'],
     'Chicken & Rice':['chicken curry','honey garlic chicken','Chicken Egg Fried Rice','Chicken Noodle Stir-Fry','Sweet Chilli Chicken Noodles','Sticky Teriyaki Chicken & Rice','BBQ Chicken Rice Bowls','Lemon Garlic Chicken & Potatoes'],
     'Mexican & Takeaway':['Chicken fajitas','chicken kebab','Mild Chicken Enchiladas','Beef Taco Rice Bowls','Chicken Burrito Bowls','BBQ Chicken Quesadillas','Chicken Shawarma & Flatbreads','chilli','lamb bhuna'],
-    'Comfort Food':['bangers & mash','Ultimate Rich Beef Stew & Suet Dumplings','Toad in the Hole, Mash, Carrots, Peas & Gravy','Sausage, Mash & Beans','Giant Sausage Rolls, Chips & Peas','burgers','hot dogs'],
+    'Comfort Food':['bangers & mash','Sausage, Mash & Beans','Giant Sausage Rolls, Chips & Peas','burgers','hot dogs'],
+    'Winter Warmers':['Ultimate Rich Beef Stew & Suet Dumplings','Toad in the Hole, Mash, Carrots, Peas & Gravy'],
+    'Luxury & Treats':[],
     'Quick & Easy':['Jacket potatoes','Chicken nuggets','Pizza','beans on toast','fry up','homemade pizza','Ham, Egg & Chips','Chicken & Stuffing Baguettes'],
     'Roasts':['Chicken Roast dinner','Chicken & Stuffing Yorkshire Pudding Wraps'],
     'Fish & Seafood':['tuna steak','fish fingers','chicken ceasar salad']
