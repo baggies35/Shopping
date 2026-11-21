@@ -17,6 +17,7 @@
   const byName={};Object.entries(assigned).forEach(([cat,names])=>names.forEach(n=>byName[n.toLowerCase()]=cat));
   const key='our-shop-meal-category';
   let current='All meals';
+  let search='';
   try{const remembered=localStorage.getItem(key);if(categories.includes(remembered))current=remembered;}catch(e){}
   function category(m){return categories.includes(m.category)?m.category:(byName[String(m.name||'').toLowerCase()]||'Comfort Food');}
   function matches(m){return current==='All meals'||category(m)===current;}
@@ -32,10 +33,11 @@
         :'<div class="item"><div><b>'+name+'</b><div class="muted">'+n+' ingredients</div></div><div><button class="btn small alt" onclick="editMeal(\''+arg+'\')">Edit</button> <button class="btn small red" onclick="deleteMeal(\''+arg+'\')">Delete</button></div></div>';
     }).join('');
   }
-  function filtered(){return Array.isArray(S?.meals)?S.meals.filter(matches):[];}
+  function filtered(){return Array.isArray(S?.meals)?S.meals.filter(m=>matches(m)&&String(m.name||'').toLowerCase().includes(search.trim().toLowerCase())):[];}
+  function searchMarkup(){return '<input id="mealPickerSearch" type="search" placeholder="Search meals, e.g. Lamb Bhuna" aria-label="Search meals" value="'+search.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')+'" style="width:100%;margin:8px 0 12px" autocomplete="off">';}
   function paintPicker(){
     const target=document.getElementById('pickMeals');if(!target)return;
-    const ms=filtered();target.innerHTML=tabMarkup()+(ms.length?rows(ms,true):'<p class="muted">No meals in this category yet.</p>');
+    const ms=filtered();target.innerHTML=searchMarkup()+tabMarkup()+(ms.length?rows(ms,true):'<p class="muted">No matching meals.</p>');
   }
   function paintSetup(){
     if(typeof setupMode!=='undefined'&&setupMode!=='meals')return;
@@ -43,6 +45,14 @@
     const ms=filtered();
     target.innerHTML='<div class="card"><div class="between"><b>Meals ('+(Array.isArray(S?.meals)?S.meals.length:0)+')</b><button class="btn small" onclick="addMeal()">Add meal</button></div>'+tabMarkup()+(ms.length?rows(ms,false):'<p class="muted">No meals in this category yet.</p>')+'</div>';
   }
+  document.addEventListener('input',function(e){
+    if(e.target.id!=='mealPickerSearch')return;
+    search=e.target.value;
+    const start=e.target.selectionStart,end=e.target.selectionEnd;
+    paintPicker();
+    const input=document.getElementById('mealPickerSearch');
+    if(input){input.focus();try{input.setSelectionRange(start,end);}catch(err){}}
+  });
   document.addEventListener('click',function(e){
     const b=e.target.closest('[data-meal-category]');if(!b)return;
     current=b.getAttribute('data-meal-category');
